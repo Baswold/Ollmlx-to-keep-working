@@ -323,5 +323,6 @@ func (sv SpecialVocabulary) Key() string {
 		return "padding"
 	}
 
-	panic("unknown special vocabulary type")
+	slog.Warn("unknown special vocabulary type", "type", sv.Type)
+	return "unknown"
 }

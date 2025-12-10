@@ -26,15 +26,15 @@ import (
 
 // Server manages the MLX Python backend subprocess and proxies requests to it
 type Server struct {
-	modelPath    string
-	mlxPort      int
-	mlxCmd       *exec.Cmd
-	mlxClient    *http.Client
-	status       llm.ServerStatus
-	ready        sync.WaitGroup
-	mu           sync.Mutex
-	cond         *sync.Cond
-	pythonPath   string
+	modelPath  string
+	mlxPort    int
+	mlxCmd     *exec.Cmd
+	mlxClient  *http.Client
+	status     llm.ServerStatus
+	ready      sync.WaitGroup
+	mu         sync.Mutex
+	cond       *sync.Cond
+	pythonPath string
 }
 
 // LoadRequest matches the structure expected by the MLX backend
@@ -143,7 +143,12 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 
 	// Send load request to MLX backend
 	loadReq := LoadRequest{ModelPath: s.modelPath}
-	reqBody, _ := json.Marshal(loadReq)
+	reqBody, err := json.Marshal(loadReq)
+	if err != nil {
+		slog.Error("failed to marshal MLX load request", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	mlxURL := fmt.Sprintf("http://127.0.0.1:%d/load", s.mlxPort)
 	resp, err := s.mlxClient.Post(mlxURL, "application/json", bytes.NewReader(reqBody))
@@ -155,7 +160,13 @@ func (s *Server) load(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read MLX backend load response", "error", err)
+			http.Error(w, "failed to read backend response", http.StatusInternalServerError)
+			return
+		}
+
 		slog.Error("MLX backend load failed", "status", resp.StatusCode, "body", string(body))
 		http.Error(w, string(body), resp.StatusCode)
 		return

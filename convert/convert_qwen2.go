@@ -1,6 +1,10 @@
 package convert
 
-import "github.com/ollama/ollama/fs/ggml"
+import (
+	"log/slog"
+
+	"github.com/ollama/ollama/fs/ggml"
+)
 
 type qwen2Model struct {
 	ModelParameters
@@ -43,7 +47,7 @@ func (q *qwen2Model) KV(t *Tokenizer) ggml.KV {
 	case "mrope", "default":
 		kv["qwen2.rope.mrope_section"] = q.RopeScaling.MropeSection
 	default:
-		panic("unknown rope scaling type")
+		slog.Warn("unknown rope scaling type", "type", q.RopeScaling.Type)
 	}
 	return kv
 }

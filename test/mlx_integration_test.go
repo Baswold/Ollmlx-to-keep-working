@@ -1,11 +1,9 @@
 package test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/ollama/ollama/llm"
 )
@@ -48,10 +46,11 @@ func TestMLXModelDetection(t *testing.T) {
 func TestMLXModelManager(t *testing.T) {
 	// Create temporary directory for test models
 	tmpDir := t.TempDir()
+	t.Setenv("OLLAMA_MODELS", tmpDir)
 
 	// Create a fake MLX model directory
 	modelName := "test-model"
-	modelPath := filepath.Join(tmpDir, modelName)
+	modelPath := filepath.Join(tmpDir, "mlx", modelName)
 	os.MkdirAll(modelPath, 0755)
 
 	// Create required MLX model files
@@ -106,6 +105,12 @@ func TestMLXModelPull(t *testing.T) {
 		t.Skip("skipping pull test in short mode")
 	}
 
+	if os.Getenv("RUN_MLX_PULL_TEST") == "" {
+		t.Skip("set RUN_MLX_PULL_TEST=1 to exercise MLX pull")
+	}
+
+	t.Setenv("OLLAMA_MODELS", t.TempDir())
+
 	manager := llm.NewMLXModelManager()
 
 	// Use a very small test model
@@ -116,9 +121,6 @@ func TestMLXModelPull(t *testing.T) {
 		if manager.ModelExists(testModel) {
 			t.Skip("test model already exists")
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
 
 		// Mock progress function
 		progressCalled := false

@@ -34,8 +34,10 @@ except ImportError:
 
 try:
     import mlx.core as mx
-    from mlx_lm.models import get_model
-    from mlx_lm.tokenizers import get_tokenizer
+    import mlx_lm
+    from mlx_lm import load as get_model
+    from mlx_lm.tokenizer_utils import TokenizerWrapper as get_tokenizer
+    from mlx_lm.sample_utils import make_sampler
 except ImportError:
     print("Error: MLX is not installed. Install with:")
     print("  pip install mlx-lm")
@@ -117,29 +119,82 @@ class MLXModelManager:
             model_name: Model identifier (e.g., "meta-llama/Llama-2-7b")
 
         Raises:
+            ValueError: If model_name is invalid
             RuntimeError: If model cannot be loaded
+            TimeoutError: If loading takes too long
         """
+        # Input validation
+        if not model_name or not isinstance(model_name, str):
+            raise ValueError("Model name must be a non-empty string")
+
+        if len(model_name) > 256:
+            raise ValueError("Model name is too long (max 256 characters)")
+
+        # Check if model is already loaded
         if self.current_model_name == model_name:
             logger.info(f"Model {model_name} already loaded")
             return
 
         logger.info(f"Loading MLX model: {model_name}")
+        
         try:
             # Try to load from local cache first
             local_path = self.model_path / model_name.replace("/", "_")
+            
             if local_path.exists():
                 logger.info(f"Loading from local cache: {local_path}")
+                
+                # Validate that this is a proper MLX model directory
+                config_path = local_path / "config.json"
+                if not config_path.exists():
+                    raise RuntimeError(f"Invalid MLX model directory: missing config.json in {local_path}")
+                
+                # Check for model weights
+                safetensors_path = local_path / "model.safetensors"
+                weights_path = local_path / "weights.npz"
+                
+                if not (safetensors_path.exists() or weights_path.exists()):
+                    raise RuntimeError(f"Invalid MLX model directory: no model weights found in {local_path}")
+                
                 self.model, self.tokenizer = get_model(str(local_path))
             else:
                 # Load from Hugging Face
                 logger.info(f"Loading from Hugging Face: {model_name}")
+                
+                # Validate Hugging Face model format
+                if "/" not in model_name:
+                    logger.warning(f"Model name {model_name} doesn't look like a Hugging Face model ID (expected format: org/model)")
+                
                 self.model, self.tokenizer = get_model(model_name)
+
+            # Validate that model and tokenizer were loaded
+            if self.model is None:
+                raise RuntimeError("Model loading returned None")
+            
+            if self.tokenizer is None:
+                raise RuntimeError("Tokenizer loading returned None")
 
             self.current_model_name = model_name
             logger.info(f"Successfully loaded {model_name}")
+            
         except Exception as e:
             logger.error(f"Failed to load model {model_name}: {e}")
-            raise RuntimeError(f"Failed to load model: {e}")
+            
+            # Clean up if we partially loaded
+            self.model = None
+            self.tokenizer = None
+            self.current_model_name = None
+            
+            # Provide more specific error messages
+            error_msg = str(e)
+            if "not found" in error_msg.lower() or "404" in error_msg:
+                raise RuntimeError(f"Model not found: {model_name}. Please check the model name and try again.")
+            elif "connection" in error_msg.lower() or "network" in error_msg.lower():
+                raise RuntimeError(f"Network error while loading model: {e}. Please check your internet connection.")
+            elif "memory" in error_msg.lower() or "out of memory" in error_msg.lower():
+                raise RuntimeError(f"Out of memory while loading model: {e}. Try a smaller model or free up system resources.")
+            else:
+                raise RuntimeError(f"Failed to load model: {e}")
 
     async def generate(
         self,
@@ -163,56 +218,123 @@ class MLXModelManager:
 
         Yields:
             CompletionResponse objects for streaming
+
+        Raises:
+            ValueError: If prompt is invalid or parameters are out of range
+            RuntimeError: If generation fails
         """
+        # Input validation
+        if not prompt or not isinstance(prompt, str):
+            raise ValueError("Prompt must be a non-empty string")
+
+        if len(prompt) > 8192:  # Reasonable max prompt length
+            raise ValueError("Prompt is too long (max 8192 characters)")
+
+        # Validate sampling parameters
+        if not (0.0 <= temperature <= 2.0):
+            raise ValueError("Temperature must be between 0.0 and 2.0")
+
+        if not (0 <= top_k <= 1000):
+            raise ValueError("Top-K must be between 0 and 1000")
+
+        if not (0.0 <= top_p <= 1.0):
+            raise ValueError("Top-P must be between 0.0 and 1.0")
+
+        if not (1 <= num_predict <= 4096):
+            raise ValueError("Number of tokens to predict must be between 1 and 4096")
+
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("No model loaded")
 
         try:
-            # Tokenize input
-            prompt_tokens = self.tokenizer.encode(prompt)
+            # Tokenize input with error handling
+            try:
+                prompt_tokens = self.tokenizer.encode(prompt)
+                if len(prompt_tokens) > 8192:  # Max context length
+                    raise ValueError(f"Prompt exceeds maximum context length (8192 tokens, got {len(prompt_tokens)})")
+            except Exception as tokenize_error:
+                raise RuntimeError(f"Failed to tokenize prompt: {tokenize_error}")
+
             prompt_eval_start = time.time()
             eval_start = time.time()
 
-            # Generate tokens
-            tokens = prompt_tokens.copy()
-            for i in range(num_predict):
-                # Process through model
-                logits = self.model(mx.array(tokens[-1:]))
-
-                # Sample next token
-                if temperature == 0.0:
-                    # Greedy sampling
-                    next_token = mx.argmax(logits[0, -1, :]).item()
-                else:
-                    # Temperature + top_k + top_p sampling
-                    logits = logits[0, -1, :] / temperature
-                    logits = mx.softmax(logits)
-
-                    # Top-K filtering
-                    if top_k > 0:
-                        top_k_logits, top_k_indices = mx.topk(logits, k=top_k)
-                        logits = mx.zeros_like(logits)
-                        for idx, val in zip(top_k_indices, top_k_logits):
-                            logits[idx] = val
-
-                    # Sample from distribution
-                    next_token = mx.random.categorical(mx.log(logits + 1e-10)).item()
-
-                tokens.append(next_token)
-
-                # Decode token to text
-                token_text = self.tokenizer.decode([next_token])
-
-                # Yield streaming response
-                eval_duration = int((time.time() - eval_start) * 1e9)
-                yield CompletionResponse(
-                    content=token_text,
-                    done=False,
-                    prompt_eval_count=len(prompt_tokens),
-                    prompt_eval_duration=int((time.time() - prompt_eval_start) * 1e9),
-                    eval_count=i + 1,
-                    eval_duration=eval_duration,
+            # Create sampler for MLX generation with validation
+            try:
+                sampler = make_sampler(
+                    temp=temperature,
+                    top_p=top_p,
+                    top_k=top_k
                 )
+            except Exception as sampler_error:
+                raise RuntimeError(f"Failed to create sampler: {sampler_error}")
+
+            # Use mlx_lm's stream_generate for proper token generation
+            generated_tokens = []
+            token_count = 0
+            max_tokens_generated = 0
+            
+            # Generate tokens using mlx_lm's streaming interface
+            try:
+                for response in mlx_lm.stream_generate(
+                    self.model, 
+                    self.tokenizer, 
+                    prompt=prompt,
+                    max_tokens=num_predict,
+                    sampler=sampler
+                ):
+                    if hasattr(response, 'text'):
+                        token_text = response.text
+                        generated_tokens.append(token_text)
+                        token_count += 1
+                        max_tokens_generated += 1
+                        
+                        # Safety check: prevent infinite loops
+                        if max_tokens_generated > num_predict * 2:
+                            logger.warning(f"Generated more tokens than requested ({max_tokens_generated} > {num_predict})")
+                            break
+                        
+                        # Yield streaming response
+                        eval_duration = int((time.time() - eval_start) * 1e9)
+                        yield CompletionResponse(
+                            content=token_text,
+                            done=False,
+                            prompt_eval_count=len(prompt_tokens),
+                            prompt_eval_duration=int((time.time() - prompt_eval_start) * 1e9),
+                            eval_count=token_count,
+                            eval_duration=eval_duration,
+                        )
+                        
+                        # Reset timer for next token
+                        eval_start = time.time()
+                        
+                        # Stop if we've generated enough tokens
+                        if token_count >= num_predict:
+                            break
+
+            except Exception as generate_error:
+                error_msg = str(generate_error)
+                logger.error(f"Generation failed: {error_msg}")
+                
+                # Provide specific error messages
+                if "out of memory" in error_msg.lower():
+                    yield CompletionResponse(
+                        content="Error: Out of memory during generation. Try a smaller model or shorter prompt.",
+                        done=True,
+                        done_reason="error",
+                    )
+                elif "timeout" in error_msg.lower():
+                    yield CompletionResponse(
+                        content="Error: Generation timed out. Try a shorter prompt or fewer tokens.",
+                        done=True,
+                        done_reason="error",
+                    )
+                else:
+                    yield CompletionResponse(
+                        content=f"Error: Generation failed - {error_msg}",
+                        done=True,
+                        done_reason="error",
+                    )
+                return
 
             # Final response
             eval_duration = int((time.time() - eval_start) * 1e9)
@@ -222,7 +344,7 @@ class MLXModelManager:
                 done_reason="stop",
                 prompt_eval_count=len(prompt_tokens),
                 prompt_eval_duration=int((time.time() - prompt_eval_start) * 1e9),
-                eval_count=len(tokens) - len(prompt_tokens),
+                eval_count=token_count,
                 eval_duration=eval_duration,
             )
 

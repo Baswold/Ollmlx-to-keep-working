@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ollama/ollama/envconfig"
 )
 
 // MLXModelInfo represents metadata about an MLX model
@@ -32,9 +34,8 @@ type MLXModelManager struct {
 
 // NewMLXModelManager creates a new MLX model manager
 func NewMLXModelManager() *MLXModelManager {
-	// Use Ollama's standard model directory structure
-	homeDir, _ := os.UserHomeDir()
-	modelsDir := filepath.Join(homeDir, ".ollama", "models", "mlx")
+	// Use Ollama's model directory structure respecting environment overrides
+	modelsDir := filepath.Join(envconfig.Models(), "mlx")
 	os.MkdirAll(modelsDir, 0755)
 
 	return &MLXModelManager{

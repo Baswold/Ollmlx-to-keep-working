@@ -30,6 +30,7 @@ func (f ModelFormat) String() string {
 // DetectModelFormat determines the format of a model based on its path and metadata
 func DetectModelFormat(modelPath string) ModelFormat {
 	// Check file extension first
+	lowerPath := strings.ToLower(modelPath)
 	ext := strings.ToLower(filepath.Ext(modelPath))
 
 	// GGUF files have .gguf extension
@@ -57,15 +58,14 @@ func DetectModelFormat(modelPath string) ModelFormat {
 
 	// Check for Hugging Face model names (e.g., "mlx-community/Llama-3.2-3B-Instruct-4bit")
 	// These should be treated as MLX models that need to be downloaded
+	if strings.Contains(lowerPath, "-mlx") {
+		return ModelFormatMLX
+	}
+
 	if strings.Contains(modelPath, "/") && !filepath.IsAbs(modelPath) {
 		// Likely a HuggingFace model reference
 		// MLX community models are prefixed with "mlx-community/"
 		if strings.HasPrefix(modelPath, "mlx-community/") {
-			return ModelFormatMLX
-		}
-
-		// Check if it's a known MLX model pattern
-		if strings.Contains(strings.ToLower(modelPath), "-mlx") {
 			return ModelFormatMLX
 		}
 	}

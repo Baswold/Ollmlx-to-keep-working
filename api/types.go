@@ -39,16 +39,23 @@ func (e StatusError) Error() string {
 }
 
 type AuthorizationError struct {
-	StatusCode int
-	Status     string
-	SigninURL  string `json:"signin_url"`
+	StatusCode   int
+	Status       string
+	SigninURL    string `json:"signin_url"`
+	ErrorMessage string `json:"error"`
 }
 
 func (e AuthorizationError) Error() string {
-	if e.Status != "" {
+	switch {
+	case e.Status != "" && e.ErrorMessage != "":
+		return fmt.Sprintf("%s: %s", e.Status, e.ErrorMessage)
+	case e.Status != "":
 		return e.Status
+	case e.ErrorMessage != "":
+		return e.ErrorMessage
+	default:
+		return "something went wrong, please see the ollama server logs for details"
 	}
-	return "something went wrong, please see the ollama server logs for details"
 }
 
 // ImageData represents the raw binary data of an image file.

@@ -2,7 +2,7 @@
 
 **🚀 Apple Silicon Optimized** | **✨ 100% Ollama Compatible** | **🔄 MLX + GGUF Support**
 
-ollmlx is a fork of Ollama that adds native support for **MLX models** while maintaining 100% compatibility with Ollama's API and CLI.
+ollmlx is a fork of Ollama that **replaces the GGUF/llama.cpp inference layer with MLX** while maintaining 100% compatibility with Ollama's API and CLI.
 
 ## What is ollmlx?
 
@@ -37,6 +37,8 @@ pip install -r mlx_backend/requirements.txt
 # Run the server
 ./ollama serve
 ```
+
+> **Tip:** ollmlx stores MLX caches alongside standard models under `$(OLLAMA_MODELS)/mlx` (defaults to `~/.ollama/models/mlx`). Set `OLLAMA_MODELS=/custom/path` to relocate both GGUF and MLX caches.
 
 ### Pull an MLX Model
 
@@ -77,6 +79,8 @@ Popular MLX models from HuggingFace (all use `mlx-community/` prefix):
 | SmolLM2 Instruct (4-bit)       | 1.7B       | ~1GB   | `ollama pull mlx-community/SmolLM2-1.7B-Instruct-4bit`|
 
 Browse all MLX models: https://huggingface.co/mlx-community
+
+For ad-hoc downloads, references ending in `-mlx` (e.g., `gemma-3-270m-4bit`) are auto-detected as MLX and stored under `$(OLLAMA_MODELS)/mlx`.
 
 ## Feature Comparison
 

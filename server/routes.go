@@ -174,6 +174,13 @@ func (s *Server) GenerateHandler(c *gin.Context) {
 		return
 	}
 
+	// Check if this is an MLX model
+	if IsMLXModelReference(req.Model) {
+		// Route to MLX backend
+		s.generateMLXModel(c, &req)
+		return
+	}
+
 	name := model.ParseName(req.Model)
 	if !name.IsValid() {
 		// Ideally this is "invalid model name" but we're keeping with

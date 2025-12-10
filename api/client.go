@@ -190,9 +190,10 @@ func (c *Client) stream(ctx context.Context, method, path string, data any, fn f
 
 		if response.StatusCode == http.StatusUnauthorized {
 			return AuthorizationError{
-				StatusCode: response.StatusCode,
-				Status:     response.Status,
-				SigninURL:  errorResponse.SigninURL,
+				StatusCode:   response.StatusCode,
+				Status:       response.Status,
+				SigninURL:    errorResponse.SigninURL,
+				ErrorMessage: errorResponse.Error,
 			}
 		} else if response.StatusCode >= http.StatusBadRequest {
 			return StatusError{

@@ -571,6 +571,19 @@ func PushHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if _, err := client.Whoami(cmd.Context()); err != nil {
+		var authErr api.AuthorizationError
+		if errors.As(err, &authErr) {
+			fmt.Println("You need to be signed in to push")
+			if authErr.SigninURL != "" {
+				fmt.Printf(ConnectInstructions, authErr.SigninURL)
+			}
+			return nil
+		}
+
+		return err
+	}
+
 	n := model.ParseName(args[0])
 
 	p := progress.NewProgress(os.Stderr)
@@ -613,6 +626,29 @@ func PushHandler(cmd *cobra.Command, args []string) error {
 		if spinner != nil {
 			spinner.Stop()
 		}
+
+		var authErr api.AuthorizationError
+		if errors.As(err, &authErr) {
+			errStr := strings.ToLower(authErr.ErrorMessage)
+			switch {
+			case strings.Contains(errStr, "not signed in"), strings.Contains(errStr, "signin"):
+				fmt.Println("You need to be signed in to push")
+				if authErr.SigninURL != "" {
+					fmt.Printf(ConnectInstructions, authErr.SigninURL)
+				}
+				return nil
+			case strings.Contains(errStr, "access denied"), strings.Contains(errStr, "unauthorized"):
+				return errors.New("you are not authorized to push to this namespace, create the model under a namespace you own")
+			case errStr == "" && authErr.StatusCode == http.StatusUnauthorized:
+				fmt.Println("You need to be signed in to push")
+				if authErr.SigninURL != "" {
+					fmt.Printf(ConnectInstructions, authErr.SigninURL)
+				}
+				return nil
+			}
+
+			return err
+		}
 		errStr := strings.ToLower(err.Error())
 		if strings.Contains(errStr, "access denied") || strings.Contains(errStr, "unauthorized") {
 			return errors.New("you are not authorized to push to this namespace, create the model under a namespace you own")
@@ -621,7 +657,9 @@ func PushHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	p.Stop()
-	spinner.Stop()
+	if spinner != nil {
+		spinner.Stop()
+	}
 
 	destination := n.String()
 	if strings.HasSuffix(n.Host, ".ollama.ai") || strings.HasSuffix(n.Host, ".ollama.com") {
@@ -1598,7 +1636,7 @@ func versionHandler(cmd *cobra.Command, _ []string) {
 	}
 
 	if serverVersion != "" {
-		fmt.Printf("ollama version is %s\n", serverVersion)
+		fmt.Printf("ollmlx version is %s\n", serverVersion)
 	}
 
 	if serverVersion != version.Version {
@@ -1630,8 +1668,8 @@ func NewCLI() *cobra.Command {
 	}
 
 	rootCmd := &cobra.Command{
-		Use:           "ollama",
-		Short:         "Large language model runner",
+		Use:           "ollmlx",
+		Short:         "Apple Silicon optimized LLM inference with MLX",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -1662,7 +1700,7 @@ func NewCLI() *cobra.Command {
 
 	showCmd := &cobra.Command{
 		Use:     "show MODEL",
-		Short:   "Show information for a model",
+		Short:   "Show MLX model information and metadata",
 		Args:    cobra.ExactArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    ShowHandler,
@@ -1677,7 +1715,7 @@ func NewCLI() *cobra.Command {
 
 	runCmd := &cobra.Command{
 		Use:     "run MODEL [PROMPT]",
-		Short:   "Run a model",
+		Short:   "Run an MLX model interactively",
 		Args:    cobra.MinimumNArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    RunHandler,
@@ -1705,14 +1743,14 @@ func NewCLI() *cobra.Command {
 	serveCmd := &cobra.Command{
 		Use:     "serve",
 		Aliases: []string{"start"},
-		Short:   "Start ollama",
+		Short:   "Start ollmlx server with MLX backend",
 		Args:    cobra.ExactArgs(0),
 		RunE:    RunServer,
 	}
 
 	pullCmd := &cobra.Command{
 		Use:     "pull MODEL",
-		Short:   "Pull a model from a registry",
+		Short:   "Pull an MLX model from HuggingFace",
 		Args:    cobra.ExactArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    PullHandler,
@@ -1732,7 +1770,7 @@ func NewCLI() *cobra.Command {
 
 	signinCmd := &cobra.Command{
 		Use:     "signin",
-		Short:   "Sign in to ollama.com",
+		Short:   "Sign in to ollmlx service",
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
 		RunE:    SigninHandler,
@@ -1740,7 +1778,7 @@ func NewCLI() *cobra.Command {
 
 	signoutCmd := &cobra.Command{
 		Use:     "signout",
-		Short:   "Sign out from ollama.com",
+		Short:   "Sign out from ollmlx service",
 		Args:    cobra.ExactArgs(0),
 		PreRunE: checkServerHeartbeat,
 		RunE:    SignoutHandler,
@@ -1749,7 +1787,7 @@ func NewCLI() *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List models",
+		Short:   "List installed MLX models",
 		PreRunE: checkServerHeartbeat,
 		RunE:    ListHandler,
 	}
@@ -1770,7 +1808,7 @@ func NewCLI() *cobra.Command {
 
 	deleteCmd := &cobra.Command{
 		Use:     "rm MODEL [MODEL...]",
-		Short:   "Remove a model",
+		Short:   "Remove MLX models",
 		Args:    cobra.MinimumNArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    DeleteHandler,

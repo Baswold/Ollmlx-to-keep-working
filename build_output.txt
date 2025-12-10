@@ -1,0 +1,4 @@
+# github.com/ollama/ollama/server
+server/routes_mlx.go:90:18: undefined: api.ModelInfo
+server/routes_mlx.go:97:3: unknown field Size in struct literal of type api.ShowResponse
+server/routes_mlx.go:98:3: unknown field Digest in struct literal of type api.ShowResponse

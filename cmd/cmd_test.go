@@ -820,6 +820,14 @@ func TestPushHandler(t *testing.T) {
 					if r.Method != http.MethodPost {
 						t.Errorf("expected POST request, got %s", r.Method)
 					}
+
+					w.Header().Set("Content-Type", "application/json")
+					if err := json.NewEncoder(w).Encode(map[string]string{
+						"id":    "00000000-0000-0000-0000-000000000000",
+						"email": "user@example.com",
+					}); err != nil {
+						t.Fatalf("failed to write response: %v", err)
+					}
 				},
 			},
 			expectedOutput: "\nYou can find your model at:\n\n\thttps://ollama.com/test-model\n",
@@ -863,6 +871,14 @@ func TestPushHandler(t *testing.T) {
 					if r.Method != http.MethodPost {
 						t.Errorf("expected POST request, got %s", r.Method)
 					}
+
+					w.Header().Set("Content-Type", "application/json")
+					if err := json.NewEncoder(w).Encode(map[string]string{
+						"id":    "00000000-0000-0000-0000-000000000000",
+						"email": "user@example.com",
+					}); err != nil {
+						t.Fatalf("failed to write response: %v", err)
+					}
 				},
 			},
 			expectedError: "you are not authorized to push to this namespace, create the model under a namespace you own",
@@ -876,6 +892,7 @@ func TestPushHandler(t *testing.T) {
 					handler(w, r)
 					return
 				}
+				t.Logf("unexpected path: %s", r.URL.Path)
 				http.Error(w, "not found", http.StatusNotFound)
 			}))
 			defer mockServer.Close()

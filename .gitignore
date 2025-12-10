@@ -1,17 +1,74 @@
-.DS_Store
-.vscode
-.env
-.venv
-.swp
-dist
-build
-.cache
-.gocache
+# ollmlx - Git Ignore File
+
+# Binary
+ollmlx
+ollama
+ollmlx.exe
 *.exe
-.idea
-test_data
-*.crt
-__debug_bin*
-llama/build
-llama/vendor
-/ollama
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.test
+*.out
+
+# Go workspace
+/vendor/
+/Godeps/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+mlx_backend/.venv/
+mlx_backend/__pycache__/
+
+# Logs
+*.log
+/tmp/
+/logs/
+ollmlx.log
+server.log
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Models (large files)
+models/
+.ollama/models/
+*.gguf
+*.safetensors
+*.bin
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+build/
+dist/
+
+# Compiled runners
+runner/ollamarunner/ollamarunner
+runner/mlxrunner/mlxrunner

@@ -440,7 +440,11 @@ func (s *Scheduler) load(req *LlmRequest, f *ggml.GGML, systemInfo ml.SystemInfo
 		s.activeLoading = llama
 	} else {
 		if s.activeLoading.ModelPath() != req.model.ModelPath {
-			panic(fmt.Errorf("attempting to load different model after eviction (original %v new %v)", s.activeLoading.ModelPath(), req.model.ModelPath))
+			err := fmt.Errorf("attempting to load different model after eviction (original %v new %v)", s.activeLoading.ModelPath(), req.model.ModelPath)
+			slog.Error("attempted conflicting model load", "error", err)
+			req.errCh <- err
+			s.loadedMu.Unlock()
+			return false
 		}
 	}
 
