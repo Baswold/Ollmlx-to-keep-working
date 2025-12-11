@@ -19,7 +19,6 @@
 
 > **Note:** MLX generation infrastructure is complete but requires routing fix. GGUF models work perfectly. See [test_results_mlx_generation.md](test_results_mlx_generation.md) for details.
 
-![ollmlx logo](https://github.com/ollama/ollama/assets/3325447/0d0b44e2-8f4a-4e99-9b52-a5c1c741c8f7)
 
 > **ollmlx** is a high-performance LLM inference server optimized for Apple Silicon, delivering blazing-fast inference with full Ollama API compatibility.
 
@@ -27,7 +26,7 @@
 
 ollmlx is a **drop-in replacement** for Ollama that swaps the GGUF/llama.cpp backend for Apple's **MLX** stack, while keeping the same CLI and HTTP API:
 
-- **⚡ Faster inference on Apple Silicon** (M1/M2/M3) by running MLX-native weights
+- **⚡ Faster inference on Apple Silicon** (M1/M2/M3/M4/M5) by running MLX-native weights
 - **🔄 Exact Ollama API/CLI compatibility** – same commands/endpoints/ports
 - **📦 MLX model support** – pull HF `mlx-community/*` or `*-mlx` models directly (progress bars use stable digests for MLX pulls; tool-calling not yet supported on MLX)
 - **🧠 Unified memory efficiency** – takes advantage of MLX on macOS
