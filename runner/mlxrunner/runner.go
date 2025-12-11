@@ -327,7 +327,7 @@ func Execute(args []string) error {
 
 	log.Println("MLX Runner server listening on", addr)
 	if err := httpServer.Serve(listener); err != nil {
-		log.Fatal("server error:", err)
+		slog.Error("server error", "error", err)
 		return err
 	}
 

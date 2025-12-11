@@ -120,7 +120,11 @@ func loadMLXModel(ctx context.Context, client *http.Client, port int, modelName 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		msg, _ := io.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read MLX backend load response", "error", err)
+			return fmt.Errorf("failed to read backend response: %w", err)
+		}
 		return fmt.Errorf("load failed: %s", strings.TrimSpace(string(msg)))
 	}
 	return nil
@@ -139,7 +143,12 @@ func streamMLXCompletion(ctx context.Context, c *gin.Context, client *http.Clien
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		msg, _ := io.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read MLX backend completion response", "error", err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to read backend response"})
+			return nil
+		}
 		c.AbortWithStatusJSON(resp.StatusCode, gin.H{"error": strings.TrimSpace(string(msg))})
 		return nil
 	}
@@ -206,7 +215,12 @@ func streamMLXChat(ctx context.Context, c *gin.Context, client *http.Client, por
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		msg, _ := io.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read MLX backend chat completion response", "error", err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to read backend response"})
+			return nil
+		}
 		c.AbortWithStatusJSON(resp.StatusCode, gin.H{"error": strings.TrimSpace(string(msg))})
 		return nil
 	}
@@ -285,7 +299,11 @@ func collectMLXCompletion(ctx context.Context, client *http.Client, port int, re
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		msg, _ := io.ReadAll(resp.Body)
+		msg, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("failed to read MLX backend completion response", "error", err)
+			return nil, fmt.Errorf("failed to read backend response: %w", err)
+		}
 		return nil, fmt.Errorf("completion failed: %s", strings.TrimSpace(string(msg)))
 	}
 
