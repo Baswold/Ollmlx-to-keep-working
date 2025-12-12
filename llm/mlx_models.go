@@ -215,6 +215,14 @@ func SearchMLXModels(query string, limit int) ([]HuggingFaceModelInfo, error) {
 	return models, nil
 }
 
+func getMLXBaseURL(modelID string) string {
+	if base := os.Getenv("OLLAMA_MLX_BASE_URL"); base != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimSuffix(base, "/"), modelID)
+	}
+
+	return fmt.Sprintf("https://huggingface.co/%s", modelID)
+}
+
 // DownloadMLXModel downloads an MLX model from HuggingFace
 func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, progressFn func(string, float64)) error {
 	// This is a simplified version - in production, you'd want to:
@@ -254,8 +262,8 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 
 	allFiles := append(requiredFiles, optionalFiles...)
 
-	// Base URL for HuggingFace model files
-	baseURL := fmt.Sprintf("https://huggingface.co/%s/resolve/main", modelID)
+	// Base URL for HuggingFace model files, optionally overridden for tests
+	baseURL := fmt.Sprintf("%s/resolve/main", getMLXBaseURL(modelID))
 
 	totalFiles := len(allFiles)
 	downloadedFiles := 0
