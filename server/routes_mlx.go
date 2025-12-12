@@ -93,20 +93,40 @@ func startMLXRunner(ctx context.Context, modelName string) (*exec.Cmd, int, erro
 func waitForMLXRunner(ctx context.Context, client *http.Client, port int) error {
 	deadline := time.Now().Add(30 * time.Second)
 	url := fmt.Sprintf("http://127.0.0.1:%d/health", port)
+	var lastErr error
 	for time.Now().Before(deadline) {
 		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
 			return nil
 		}
-		if resp != nil {
+
+		if err != nil {
+			lastErr = fmt.Errorf("health check request failed: %w", err)
+			slog.Warn("mlx runner health check request failed", "error", err)
+		} else {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 			resp.Body.Close()
+			message := strings.TrimSpace(string(body))
+			if message == "" {
+				message = resp.Status
+			} else {
+				message = fmt.Sprintf("%s: %s", resp.Status, message)
+			}
+			lastErr = fmt.Errorf("health check returned %s", message)
+			slog.Warn("mlx runner health check returned non-200 status", "status", resp.Status, "message", message)
 		}
 		select {
 		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("%w: %v", ctx.Err(), lastErr)
+			}
 			return ctx.Err()
 		case <-time.After(500 * time.Millisecond):
 		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("mlx runner did not become healthy: %v", lastErr)
 	}
 	return fmt.Errorf("mlx runner did not become healthy")
 }
