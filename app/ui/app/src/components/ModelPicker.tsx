@@ -208,7 +208,7 @@ export const ModelPicker = forwardRef<
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search models or mlx-community/..."
+              placeholder="Search Hugging Face or Ollama"
               autoCorrect="off"
               className="w-full px-2 py-0.5 bg-transparent border-none border-neutral-200 rounded-md outline-none focus:border-neutral-400 dark:border-neutral-600 dark:focus:border-neutral-400"
             />
