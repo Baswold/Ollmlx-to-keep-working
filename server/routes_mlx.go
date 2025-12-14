@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net"
 	"net/http"
 	"os"
@@ -50,12 +49,12 @@ func PullMLXModel(ctx context.Context, modelName string, fn func(api.ProgressRes
 		Status: fmt.Sprintf("pulling MLX model %s from HuggingFace", modelName),
 	})
 
-	err := manager.DownloadMLXModel(ctx, modelName, func(status string, progress float64) {
+	err := manager.DownloadMLXModel(ctx, modelName, func(status string, completed int64, total int64) {
 		fn(api.ProgressResponse{
 			Status:    status,
 			Digest:    digest,
-			Completed: int64(math.Round(progress)),
-			Total:     100,
+			Completed: completed,
+			Total:     total,
 		})
 	})
 
@@ -277,6 +276,54 @@ func startMLXRunner(ctx context.Context, modelName string) (*exec.Cmd, int, erro
 	}
 
 	args := []string{"--mlx-engine", "-model", modelName, "-port", strconv.Itoa(port)}
+
+	// Determine Python path
+	pythonPath := "python3"
+	if p := os.Getenv("OLLAMA_PYTHON"); p != "" {
+		pythonPath = p
+	} else {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			// Priority 1: Application Support (Ollmlx.app standard)
+			appSupport := filepath.Join(home, "Library", "Application Support", "Ollmlx", "venv", "bin", "python3")
+			// Priority 2: Dotfile (Legacy/Dev)
+			dotFile := filepath.Join(home, ".ollmlx", "venv", "bin", "python3")
+
+			if _, err := os.Stat(appSupport); err == nil {
+				pythonPath = appSupport
+			} else if _, err := os.Stat(dotFile); err == nil {
+				pythonPath = dotFile
+			} else {
+				// Bootstrap?
+				// If we are in an App Bundle, we should try to bootstrap the venv in Application Support
+				exe, _ := os.Executable()
+				resourcesReqs := filepath.Join(filepath.Dir(exe), "../Resources/mlx_backend/requirements.txt")
+				if _, err := os.Stat(resourcesReqs); err == nil {
+					// We are likely in an App Bundle and have requirements available
+					slog.Info("bootstrapping python environment in Application Support", "requirements", resourcesReqs)
+					venvDir := filepath.Join(home, "Library", "Application Support", "Ollmlx", "venv")
+					
+					// 1. Create venv
+					if err := exec.Command("python3", "-m", "venv", venvDir).Run(); err == nil {
+						// 2. Install deps
+						pip := filepath.Join(venvDir, "bin", "pip")
+						if err := exec.Command(pip, "install", "-r", resourcesReqs).Run(); err == nil {
+							pythonPath = filepath.Join(venvDir, "bin", "python3")
+							slog.Info("bootstrap complete", "python", pythonPath)
+						} else {
+							slog.Error("failed to install dependencies during bootstrap")
+						}
+					} else {
+						slog.Error("failed to create venv during bootstrap")
+					}
+				}
+			}
+		}
+	}
+
+	// append python path arg
+	args = append(args, "-python", pythonPath)
+
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -303,6 +350,7 @@ func mlxRunnerBinary() (string, error) {
 	candidates := []string{
 		filepath.Join(exeDir, "ollama-runner"),
 		filepath.Join(exeDir, "mlxrunner"),
+		filepath.Join(exeDir, "../Resources/ollama-runner"), // App Bundle
 		filepath.Join(ml.LibOllamaPath, "ollama-runner"),
 		filepath.Join(ml.LibOllamaPath, "mlxrunner"),
 		filepath.Join(wd, "bin", "ollama-runner"),
@@ -319,8 +367,11 @@ func mlxRunnerBinary() (string, error) {
 			if path == "" {
 				continue
 			}
-			if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
-				return path, nil
+			// EvalSymlinks to handle potential links
+			if validPath, err := filepath.EvalSymlinks(path); err == nil {
+				if info, err := os.Stat(validPath); err == nil && info.Mode().IsRegular() {
+					return validPath, nil
+				}
 			}
 		}
 	}
@@ -890,9 +941,7 @@ func (s *Server) generateMLXModel(c *gin.Context, req *api.GenerateRequest) {
 		downloadCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		if err := manager.DownloadMLXModel(downloadCtx, modelName, func(status string, progress float64) {
-			slog.Info("downloading MLX model", "model", modelName, "status", status, "progress", progress)
-		}); err != nil {
+	if err := manager.DownloadMLXModel(downloadCtx, modelName, nil); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to download MLX model: %v", err)})
 			return
 		}

@@ -91,6 +91,15 @@ func findMLXBackendPath() (string, error) {
 			candidates = append(candidates, filepath.Join(projectRoot, "mlx_backend", "server.py"))
 		}
 	}
+	
+	// Check App Bundle Resources
+	if exeErr == nil {
+		exeDir := filepath.Dir(exePath)
+		// If running ollama-runner, it might be in Contents/Resources
+		// If running from main, it might be in Contents/MacOS
+		candidates = append(candidates, filepath.Join(exeDir, "../Resources/mlx_backend/server.py"))
+		candidates = append(candidates, filepath.Join(exeDir, "mlx_backend/server.py"))
+	}
 
 	seen := make(map[string]struct{})
 	var uniqueCandidates []string

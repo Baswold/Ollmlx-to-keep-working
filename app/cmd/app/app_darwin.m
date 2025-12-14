@@ -49,7 +49,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
             stringByAppendingPathComponent:
                 [NSString
                     stringWithFormat:
-                        @"darwin/Ollama.app/Contents/Resources/icon.icns"]];
+                        @"darwin/Ollmlx.app/Contents/Resources/icon.icns"]];
         NSImage *customIcon = [[NSImage alloc] initWithContentsOfFile:iconPath];
         [NSApp setApplicationIconImage:customIcon];
     }
@@ -57,7 +57,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
     // Create status item and menu
     NSMenu *menu = [[NSMenu alloc] init];
     NSMenuItem *openMenuItem =
-        [[NSMenuItem alloc] initWithTitle:@"Open Ollama"
+        [[NSMenuItem alloc] initWithTitle:@"Open Ollmlx"
                                    action:@selector(openUI)
                             keyEquivalent:@""];
     [openMenuItem setTarget:self];
@@ -86,7 +86,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
 
     [menu addItem:[NSMenuItem separatorItem]];
 
-    [menu addItemWithTitle:@"Quit Ollama"
+    [menu addItemWithTitle:@"Quit Ollmlx"
                     action:@selector(quit)
              keyEquivalent:@"q"];
 
@@ -102,7 +102,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
     [self showIcon];
 
     // Application menu
-    NSString *appName = @"Ollama";
+    NSString *appName = @"Ollmlx";
 
     NSMenu *mainMenu = [[NSMenu alloc] init];
     NSMenuItem *appMenuItem = [[NSMenuItem alloc] initWithTitle:appName
@@ -312,7 +312,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
             [[NSFileManager defaultManager] currentDirectoryPath];
         NSString *bundlePath =
             [cwdPath stringByAppendingPathComponent:
-                         [NSString stringWithFormat:@"darwin/Ollama.app"]];
+                         [NSString stringWithFormat:@"darwin/Ollmlx.app"]];
         bundle = [NSBundle bundleWithPath:bundlePath];
     }
 
@@ -351,10 +351,10 @@ bool firstTimeRun,startHidden; // Set in run before initialization
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 - (void)registerSelfAsLoginItem:(BOOL)firstTimeRun {
     appLogInfo(@"using v13+ SMAppService for login registration");
-    // Maps to the file Ollama.app/Contents/Library/LaunchAgents/com.ollama.ollama.plist
-    SMAppService* service = [SMAppService agentServiceWithPlistName:@"com.ollama.ollama.plist"];
+    // Maps to the file Ollmlx.app/Contents/Library/LaunchAgents/com.ollmlx.ollmlx.plist
+    SMAppService* service = [SMAppService agentServiceWithPlistName:@"com.ollmlx.ollmlx.plist"];
     if (!service) {
-        appLogInfo(@"SMAppService failed to find service for com.ollama.ollama.plist");
+        appLogInfo(@"SMAppService failed to find service for com.ollmlx.ollmlx.plist");
         return;
     }
     SMAppServiceStatus status = [service status];
@@ -403,7 +403,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
         if (LSSharedFileListItemResolve((LSSharedFileListItemRef)item, 0,
                                         &itemURL, NULL) == noErr) {
             CFStringRef loginPath = CFURLCopyFileSystemPath(itemURL, kCFURLPOSIXPathStyle);
-            // Compare the prefix to match against "keep existing" flow, e.g. // "/Applications/Ollama.app" vs "/Applications/Ollama 2.app"
+            // Compare the prefix to match against "keep existing" flow, e.g. // "/Applications/Ollmlx.app" vs "/Applications/Ollmlx 2.app"
             if (loginPath && [(NSString *)loginPath hasPrefix:bundlePrefix]) {
                 appLogInfo([NSString stringWithFormat:@"removing login item %@", loginPath]);
                 LSSharedFileListItemRemove(loginItems,
@@ -418,7 +418,7 @@ bool firstTimeRun,startHidden; // Set in run before initialization
             CFStringRef displayName = LSSharedFileListItemCopyDisplayName((LSSharedFileListItemRef)item);
             if (displayName) {
                 NSString *name = (__bridge NSString *)displayName;
-                if ([name hasPrefix:@"Ollama"]) {
+                if ([name hasPrefix:@"Ollmlx"]) {
                     LSSharedFileListItemRemove(loginItems, (LSSharedFileListItemRef)item);
                     appLogInfo([NSString stringWithFormat:@"removing dangling login item %@", displayName]);
                 }
@@ -629,12 +629,12 @@ void killOtherInstances() {
         }
         
         if ([bundleId isEqualToString:[[NSBundle mainBundle] bundleIdentifier]] ||
-            [bundleId isEqualToString:@"ai.ollama.ollama"] ||
-            [bundleId isEqualToString:@"com.electron.ollama"]) {
+            [bundleId isEqualToString:@"ai.ollmlx.ollmlx"] ||
+            [bundleId isEqualToString:@"com.electron.ollmlx"]) {
             
             pid_t pid = app.processIdentifier;
             if (pid != myPid && pid > 0) {
-                appLogInfo([NSString stringWithFormat:@"terminating other ollama instance %d", pid]);
+                appLogInfo([NSString stringWithFormat:@"terminating other ollmlx instance %d", pid]);
                 kill(pid, SIGTERM);
             } else if (pid == -1) {
                 appLogInfo([NSString stringWithFormat:@"skipping app with invalid pid: %@", bundleId]);
@@ -700,7 +700,7 @@ bool moveToApplications(const char *src) {
 }
 
 AuthorizationRef getSymlinkAuthorization() {
-    return getAuthorization(@"Ollama is trying to install its command line "
+    return getAuthorization(@"Ollmlx is trying to install its command line "
                             @"interface (CLI) tool.",
                             @"symlink");
 }
@@ -720,7 +720,7 @@ bool moveToApplicationsWithAuthorization(const char *src) {
         return NO;
     }
 
-    // Remove existing /Applications/Ollama.app (if any)
+    // Remove existing /Applications/Ollmlx.app (if any)
     //    - We do this via /bin/rm with elevated privileges
     //
     const char *rmTool = "/bin/rm";

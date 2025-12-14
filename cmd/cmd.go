@@ -2006,6 +2006,7 @@ func NewCLI() *cobra.Command {
 		copyCmd,
 		deleteCmd,
 		runnerCmd,
+		doctorCmd,
 	)
 
 	return rootCmd

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -363,7 +362,7 @@ func (m *MLXModelManager) fetchHFFileList(ctx context.Context, modelID string) (
 }
 
 // DownloadMLXModel downloads an MLX model from HuggingFace
-func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, progressFn func(string, float64)) error {
+func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, progressFn func(string, int64, int64)) error {
 	modelPath := m.GetModelPath(modelID)
 
 	// Create model directory
@@ -386,17 +385,22 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 	}
 
 	baseURL := fmt.Sprintf("%s/resolve/main", getMLXBaseURL(modelID))
-	totalFiles := len(files)
-	downloadedFiles := 0
-
+	
+	// Calculate total size
+	var totalSize int64
+	for _, f := range files {
+		totalSize += sizes[f]
+	}
+	
+	var totalDownloaded int64
 	client := &http.Client{Timeout: 30 * time.Minute}
 
-	updateProgress := func(status string, completed int) {
+	updateProgress := func(status string, inc int64) {
 		if progressFn == nil {
 			return
 		}
-		pct := (float64(completed) / float64(totalFiles)) * 100
-		progressFn(status, math.Round(pct))
+		totalDownloaded += inc
+		progressFn(status, totalDownloaded, totalSize)
 	}
 
 	for _, filename := range files {
@@ -405,45 +409,54 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 		}
 		fileURL := fmt.Sprintf("%s/%s", baseURL, filename)
 		destPath := filepath.Join(modelPath, filename)
+		fileSize := sizes[filename]
 
-		updateProgress(fmt.Sprintf("downloading %s", filename), downloadedFiles)
+		// Initial report for this file
+		if progressFn != nil {
+			progressFn(fmt.Sprintf("pulling %s", filename), totalDownloaded, totalSize)
+		}
 
-		// Download file
-		expectSize := sizes[filename]
+		err := m.downloadFile(ctx, client, fileURL, destPath, fileSize, func(n int64) {
+			updateProgress(fmt.Sprintf("pulling %s", filename), n)
+		})
 
-		if err := m.downloadFile(ctx, client, fileURL, destPath, expectSize); err != nil {
+		if err != nil {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 			return fmt.Errorf("failed to download %s: %w", filename, err)
 		}
-
-		downloadedFiles++
-		updateProgress(fmt.Sprintf("downloaded %s", filename), downloadedFiles)
 	}
 
 	if progressFn != nil {
-		progressFn("Download complete", 100)
+		progressFn("success", totalSize, totalSize)
 	}
 
 	cleanup = false
 
 	// Compute a lightweight digest for listing/show calls.
 	if digest, err := computeDigest(modelPath); err == nil {
-		progressFn(fmt.Sprintf("digest %s", digest), 100)
+		// Just final status update, no size change
+		if progressFn != nil {
+			progressFn(fmt.Sprintf("digest %s", digest), totalSize, totalSize)
+		}
 	}
 
 	return nil
 }
 
 // downloadFile downloads a file from a URL to a local path
-func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client, url, destPath string, expectSize int64) error {
+func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client, url, destPath string, expectSize int64, progress func(int64)) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
 	}
 
 	// Skip download if the target already exists with the expected size.
+	// Note: We still need to count its size towards the total progress
 	if stat, err := os.Stat(destPath); err == nil && expectSize > 0 && stat.Size() == expectSize {
+		if progress != nil {
+			progress(expectSize)
+		}
 		return nil
 	}
 
@@ -452,12 +465,18 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 		return err
 	}
 
-	// Add HuggingFace token for authentication if available
-	for _, key := range []string{"HUGGINGFACEHUB_API_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HF_TOKEN"} {
-		if tok := strings.TrimSpace(os.Getenv(key)); tok != "" {
-			req.Header.Set("Authorization", "Bearer "+tok)
-			break
+	// Add HuggingFace token for authentication
+	token := getHFToken()
+	if token == "" {
+		for _, key := range []string{"HUGGINGFACEHUB_API_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HF_TOKEN"} {
+			if tok := strings.TrimSpace(os.Getenv(key)); tok != "" {
+				token = tok
+				break
+			}
 		}
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := client.Do(req)
@@ -466,9 +485,9 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		io.Copy(io.Discard, resp.Body)
-		return fmt.Errorf("authentication required - set HF_TOKEN environment variable with your HuggingFace token")
+		return fmt.Errorf("authentication required - please run 'ollmlx login' with your HuggingFace token")
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -483,7 +502,17 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 	}
 	defer out.Close()
 
-	if _, err = io.Copy(out, resp.Body); err != nil {
+	// Create a proxy reader that reports progress
+	reader := &ProgressReader{
+		Reader: resp.Body,
+		Callback: func(n int64) {
+			if progress != nil {
+				progress(n)
+			}
+		},
+	}
+
+	if _, err = io.Copy(out, reader); err != nil {
 		os.Remove(tmpPath)
 		return err
 	}
@@ -493,6 +522,20 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 	}
 
 	return nil
+}
+
+// ProgressReader wraps an io.Reader to report progress
+type ProgressReader struct {
+	io.Reader
+	Callback func(int64)
+}
+
+func (r *ProgressReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if n > 0 && r.Callback != nil {
+		r.Callback(int64(n))
+	}
+	return n, err
 }
 
 // GetPopularMLXModels returns a curated list of popular/recommended MLX models

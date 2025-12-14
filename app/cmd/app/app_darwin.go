@@ -24,7 +24,7 @@ import (
 
 var ollamaPath = func() string {
 	if updater.BundlePath != "" {
-		return filepath.Join(updater.BundlePath, "Contents", "Resources", "ollama")
+		return filepath.Join(updater.BundlePath, "Contents", "Resources", "ollmlx")
 	}
 
 	pwd, err := os.Getwd()
@@ -32,13 +32,13 @@ var ollamaPath = func() string {
 		slog.Warn("failed to get pwd", "error", err)
 		return ""
 	}
-	return filepath.Join(pwd, "ollama")
+	return filepath.Join(pwd, "ollmlx")
 }()
 
 var (
 	isApp           = updater.BundlePath != ""
-	appLogPath      = filepath.Join(os.Getenv("HOME"), ".ollama", "logs", "app.log")
-	launchAgentPath = filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.ollama.ollama.plist")
+	appLogPath      = filepath.Join(os.Getenv("HOME"), ".ollmlx", "logs", "app.log")
+	launchAgentPath = filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.ollmlx.ollmlx.plist")
 )
 
 // TODO(jmorganca): pre-create the window and pass
@@ -140,7 +140,7 @@ func installSymlink() {
 	defer C.free(unsafe.Pointer(cliPath))
 
 	// Check the users path first
-	cmd, _ := exec.LookPath("ollama")
+	cmd, _ := exec.LookPath("ollmlx")
 	if cmd != "" {
 		resolved, err := os.Readlink(cmd)
 		if err == nil {
@@ -152,7 +152,7 @@ func installSymlink() {
 			resolved = cmd
 		}
 		if resolved == ollamaPath {
-			slog.Info("ollama already in users PATH", "cli", cmd)
+			slog.Info("ollmlx already in users PATH", "cli", cmd)
 			return
 		}
 	}
@@ -215,13 +215,13 @@ func logStartup() {
 			if filepath.Base(p) == "MacOS" {
 				p = filepath.Dir(filepath.Dir(p))
 				if p != appPath {
-					slog.Info("starting sandboxed Ollama", "app", appPath, "sandbox", p)
+					slog.Info("starting sandboxed Ollmlx", "app", appPath, "sandbox", p)
 					return
 				}
 			}
 		}
 	}
-	slog.Info("starting Ollama", "app", appPath, "version", version.Version, "OS", updater.UserAgentOS)
+	slog.Info("starting Ollmlx", "app", appPath, "version", version.Version, "OS", updater.UserAgentOS)
 }
 
 func hideWindow(ptr unsafe.Pointer) {
@@ -237,15 +237,14 @@ func styleWindow(ptr unsafe.Pointer) {
 }
 
 func runInBackground() {
-	cmd := exec.Command(filepath.Join(updater.BundlePath, "Contents", "MacOS", "Ollama"), "hidden")
+	cmd := exec.Command(filepath.Join(updater.BundlePath, "Contents", "MacOS", "Ollmlx"), "hidden")
 	if cmd != nil {
-		err := cmd.Run()
-		if err != nil {
-			slog.Error("failed to run Ollama", "bundlePath", updater.BundlePath, "error", err)
+		if err := cmd.Run(); err != nil {
+			slog.Error("failed to run Ollmlx", "bundlePath", updater.BundlePath, "error", err)
 			os.Exit(1)
 		}
 	} else {
-		slog.Error("failed to start Ollama in background", "bundlePath", updater.BundlePath)
+		slog.Error("failed to start Ollmlx in background", "bundlePath", updater.BundlePath)
 		os.Exit(1)
 	}
 }
