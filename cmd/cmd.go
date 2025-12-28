@@ -1976,29 +1976,28 @@ The server must be running before you can pull or run models.`,
 
 	pullCmd := &cobra.Command{
 		Use:   "pull MODEL",
-		Short: "Pull an MLX model from HuggingFace",
+		Short: "Pull a model from HuggingFace or Ollama registry",
 		Long: `Download a model to use locally.
 
-By default, pulls MLX models from HuggingFace (optimized for Apple Silicon).
-Use --ollama to pull GGUF models from the Ollama registry instead.
+By default, pulls from HuggingFace using owner/repo format.
+Use --ollama to pull from the Ollama registry instead.
 
-MLX Models (default - from HuggingFace):
+From HuggingFace (default):
   ollmlx pull mlx-community/gemma-3-270m-4bit
   ollmlx pull mlx-community/Llama-3.2-1B-Instruct-4bit
-  ollmlx pull mlx-community/Mistral-7B-Instruct-v0.3-4bit
+  ollmlx pull TheBloke/Mistral-7B-v0.1-GGUF
 
-GGUF Models (from Ollama registry):
+From Ollama registry (with --ollama):
   ollmlx pull --ollama gemma3:270m
   ollmlx pull --ollama llama3.2:1b
   ollmlx pull --ollama mistral:7b
 
-Popular MLX Models:
-  gemma-3-270m-4bit      Small & fast (270M params)
-  Llama-3.2-1B-Instruct  Good balance (1B params)
-  Llama-3.2-3B-Instruct  More capable (3B params)
-  Mistral-7B-Instruct    High quality (7B params)
+Popular Models:
+  mlx-community/gemma-3-270m-4bit         Small & fast MLX (270M)
+  mlx-community/Llama-3.2-1B-Instruct     Good balance MLX (1B)
+  mlx-community/Mistral-7B-Instruct       High quality MLX (7B)
 
-Browse MLX models: https://huggingface.co/mlx-community`,
+Browse models: https://huggingface.co/models`,
 		Args:    cobra.ExactArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    PullHandler,

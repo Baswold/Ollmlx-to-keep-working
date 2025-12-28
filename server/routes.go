@@ -896,7 +896,7 @@ func (s *Server) PullHandler(c *gin.Context) {
 			ctx, cancel := context.WithCancel(c.Request.Context())
 			defer cancel()
 
-			if err := PullMLXModel(ctx, modelName, fn); err != nil {
+			if err := PullHuggingFaceModel(ctx, modelName, fn); err != nil {
 				ch <- gin.H{"error": err.Error()}
 			}
 		}()

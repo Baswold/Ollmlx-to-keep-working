@@ -28,9 +28,9 @@ import (
 	"github.com/ollama/ollama/ml"
 )
 
-// PullMLXModel downloads an MLX model from HuggingFace
-func PullMLXModel(ctx context.Context, modelName string, fn func(api.ProgressResponse)) error {
-	slog.Info("pulling MLX model from HuggingFace", "model", modelName)
+// PullHuggingFaceModel downloads a model from HuggingFace (MLX or other formats)
+func PullHuggingFaceModel(ctx context.Context, modelName string, fn func(api.ProgressResponse)) error {
+	slog.Info("pulling model from HuggingFace", "model", modelName)
 
 	digest := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(modelName)))
 
@@ -46,7 +46,7 @@ func PullMLXModel(ctx context.Context, modelName string, fn func(api.ProgressRes
 
 	// Download the model
 	fn(api.ProgressResponse{
-		Status: fmt.Sprintf("pulling MLX model %s from HuggingFace", modelName),
+		Status: fmt.Sprintf("pulling %s from HuggingFace", modelName),
 	})
 
 	err := manager.DownloadMLXModel(ctx, modelName, func(status string, completed int64, total int64) {
