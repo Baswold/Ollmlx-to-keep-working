@@ -629,6 +629,11 @@ type PullRequest struct {
 	Password string `json:"password"`           // Deprecated: ignored
 	Stream   *bool  `json:"stream,omitempty"`
 
+	// Source specifies where to pull the model from.
+	// "huggingface" (default) - Pull MLX model from HuggingFace
+	// "ollama" - Pull GGUF model from Ollama registry
+	Source string `json:"source,omitempty"`
+
 	// Deprecated: set the model name with Model instead
 	Name string `json:"name"`
 }

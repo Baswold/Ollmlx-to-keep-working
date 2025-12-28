@@ -521,7 +521,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 		if err := loadOrUnloadModel(cmd, &opts); err != nil {
 			var sErr api.AuthorizationError
 			if errors.As(err, &sErr) && sErr.StatusCode == http.StatusUnauthorized {
-				fmt.Printf("You need to be signed in to Ollama to run Cloud models.\n\n")
+				fmt.Printf("You need to be signed in to run Cloud models.\n\n")
 
 				if sErr.SigninURL != "" {
 					fmt.Printf(ConnectInstructions, sErr.SigninURL)
@@ -1181,6 +1181,9 @@ func PullHandler(cmd *cobra.Command, args []string) error {
 	// Check for verbose flag (shows detailed per-layer progress)
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
+	// Check for --ollama flag (pull from Ollama registry instead of HuggingFace)
+	useOllama, _ := cmd.Flags().GetBool("ollama")
+
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return err
@@ -1188,19 +1191,34 @@ func PullHandler(cmd *cobra.Command, args []string) error {
 
 	modelName := args[0]
 
+	// Determine source: default is HuggingFace, --ollama uses Ollama registry
+	source := "huggingface"
+	if useOllama {
+		source = "ollama"
+	}
+
 	// Clean mode: single progress bar
 	if !verbose {
-		return pullClean(cmd.Context(), client, modelName, insecure)
+		return pullClean(cmd.Context(), client, modelName, insecure, source)
 	}
 
 	// Verbose mode: original detailed output
-	return pullVerbose(cmd.Context(), client, modelName, insecure)
+	return pullVerbose(cmd.Context(), client, modelName, insecure, source)
 }
 
 // pullClean shows a single clean progress bar for the entire download
-func pullClean(ctx context.Context, client *api.Client, modelName string, insecure bool) error {
-	p := progress.NewProgress(os.Stderr)
-	defer p.Stop()
+func pullClean(ctx context.Context, client *api.Client, modelName string, insecure bool, source string) error {
+	// Extract clean model name for display
+	displayName := modelName
+	if idx := strings.LastIndex(displayName, "/"); idx >= 0 {
+		displayName = displayName[idx+1:]
+	}
+	if len(displayName) > 40 {
+		displayName = displayName[:37] + "..."
+	}
+
+	// Simple status message (no spinner)
+	fmt.Fprintf(os.Stderr, "Pulling %s...\n", displayName)
 
 	// Track total progress across all layers
 	var totalSize int64
@@ -1208,12 +1226,12 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 	layerSizes := make(map[string]int64)
 	layerCompleted := make(map[string]int64)
 
+	var p *progress.Progress
 	var mainBar *progress.Bar
-	var currentStatus string
-	var statusSpinner *progress.Spinner
+	downloadStarted := false
 
 	fn := func(resp api.ProgressResponse) error {
-		if resp.Digest != "" {
+		if resp.Digest != "" && resp.Total > 0 {
 			// Track layer sizes for total calculation
 			if _, seen := layerSizes[resp.Digest]; !seen {
 				layerSizes[resp.Digest] = resp.Total
@@ -1225,23 +1243,11 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 			layerCompleted[resp.Digest] = resp.Completed
 			totalCompleted += (resp.Completed - prevCompleted)
 
-			// Stop status spinner when downloading starts
-			if statusSpinner != nil {
-				statusSpinner.Stop()
-				statusSpinner = nil
-			}
-
-			// Create or update main progress bar
-			if mainBar == nil && totalSize > 0 {
-				// Extract clean model name for display
-				displayName := modelName
-				if idx := strings.LastIndex(displayName, "/"); idx >= 0 {
-					displayName = displayName[idx+1:]
-				}
-				if len(displayName) > 30 {
-					displayName = displayName[:27] + "..."
-				}
-				mainBar = progress.NewBar(fmt.Sprintf("Pulling %s", displayName), totalSize, 0)
+			// Create progress bar when downloading starts
+			if !downloadStarted && totalSize > 0 {
+				downloadStarted = true
+				p = progress.NewProgress(os.Stderr)
+				mainBar = progress.NewBar("", totalSize, 0)
 				p.Add("main", mainBar)
 			}
 
@@ -1252,45 +1258,27 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 				}
 				mainBar.Set(totalCompleted)
 			}
-		} else if resp.Status != "" && resp.Status != currentStatus {
-			currentStatus = resp.Status
-
-			// Only show spinner for non-download status messages
-			if statusSpinner != nil {
-				statusSpinner.Stop()
-			}
-
-			// Clean up status message
-			status := resp.Status
-			if strings.HasPrefix(status, "pulling") {
-				status = "Preparing download..."
-			} else if strings.Contains(status, "verifying") {
-				status = "Verifying..."
-			} else if strings.Contains(status, "writing") {
-				status = "Saving..."
-			}
-
-			statusSpinner = progress.NewSpinner(status)
-			p.Add(resp.Status, statusSpinner)
 		}
 
 		return nil
 	}
 
-	request := api.PullRequest{Name: modelName, Insecure: insecure}
+	request := api.PullRequest{Name: modelName, Insecure: insecure, Source: source}
 	err := client.Pull(ctx, &request, fn)
 
+	if p != nil {
+		p.Stop()
+	}
+
 	if err == nil {
-		// Clear progress and show success
-		p.StopAndClear()
-		fmt.Fprintf(os.Stderr, "✓ Successfully pulled %s\n", modelName)
+		fmt.Fprintf(os.Stderr, "✓ Done\n")
 	}
 
 	return err
 }
 
 // pullVerbose shows detailed per-layer progress (original behavior)
-func pullVerbose(ctx context.Context, client *api.Client, modelName string, insecure bool) error {
+func pullVerbose(ctx context.Context, client *api.Client, modelName string, insecure bool, source string) error {
 	p := progress.NewProgress(os.Stderr)
 	defer p.Stop()
 
@@ -1335,7 +1323,7 @@ func pullVerbose(ctx context.Context, client *api.Client, modelName string, inse
 		return nil
 	}
 
-	request := api.PullRequest{Name: modelName, Insecure: insecure}
+	request := api.PullRequest{Name: modelName, Insecure: insecure, Source: source}
 	return client.Pull(ctx, &request, fn)
 }
 
@@ -1828,7 +1816,7 @@ func versionHandler(cmd *cobra.Command, _ []string) {
 
 	serverVersion, err := client.Version(cmd.Context())
 	if err != nil {
-		fmt.Println("Warning: could not connect to a running Ollama instance")
+		fmt.Println("Warning: could not connect to a running ollmlx instance")
 	}
 
 	if serverVersion != "" {
@@ -1989,20 +1977,28 @@ The server must be running before you can pull or run models.`,
 	pullCmd := &cobra.Command{
 		Use:   "pull MODEL",
 		Short: "Pull an MLX model from HuggingFace",
-		Long: `Download an MLX model from HuggingFace to use locally.
+		Long: `Download a model to use locally.
 
-Examples:
+By default, pulls MLX models from HuggingFace (optimized for Apple Silicon).
+Use --ollama to pull GGUF models from the Ollama registry instead.
+
+MLX Models (default - from HuggingFace):
   ollmlx pull mlx-community/gemma-3-270m-4bit
   ollmlx pull mlx-community/Llama-3.2-1B-Instruct-4bit
   ollmlx pull mlx-community/Mistral-7B-Instruct-v0.3-4bit
 
-Popular Models:
+GGUF Models (from Ollama registry):
+  ollmlx pull --ollama gemma3:270m
+  ollmlx pull --ollama llama3.2:1b
+  ollmlx pull --ollama mistral:7b
+
+Popular MLX Models:
   gemma-3-270m-4bit      Small & fast (270M params)
   Llama-3.2-1B-Instruct  Good balance (1B params)
   Llama-3.2-3B-Instruct  More capable (3B params)
   Mistral-7B-Instruct    High quality (7B params)
 
-Browse all models: https://huggingface.co/mlx-community`,
+Browse MLX models: https://huggingface.co/mlx-community`,
 		Args:    cobra.ExactArgs(1),
 		PreRunE: checkServerHeartbeat,
 		RunE:    PullHandler,
@@ -2010,6 +2006,7 @@ Browse all models: https://huggingface.co/mlx-community`,
 
 	pullCmd.Flags().Bool("insecure", false, "Use an insecure registry")
 	pullCmd.Flags().BoolP("verbose", "v", false, "Show detailed per-layer progress")
+	pullCmd.Flags().Bool("ollama", false, "Pull from Ollama registry (GGUF models) instead of HuggingFace")
 
 	pushCmd := &cobra.Command{
 		Use:     "push MODEL",

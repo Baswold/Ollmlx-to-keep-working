@@ -72,7 +72,7 @@ var useClient2 = experimentEnabled("client2")
 // reduced context length on some models
 var lowVRAMThreshold uint64 = 20 * format.GibiByte
 
-var mode string = gin.DebugMode
+var mode string = gin.ReleaseMode
 
 type Server struct {
 	addr    net.Addr
@@ -879,8 +879,13 @@ func (s *Server) PullHandler(c *gin.Context) {
 
 	modelName := cmp.Or(req.Model, req.Name)
 
-	// Check if this is an MLX model reference
-	if IsMLXModelReference(modelName) {
+	// Determine source: explicit source field, or detect from model name pattern
+	// Default behavior (Source == "" or "huggingface"): MLX from HuggingFace
+	// With Source == "ollama": GGUF from Ollama registry
+	useOllamaRegistry := req.Source == "ollama"
+
+	// If not explicitly using Ollama registry, treat as MLX model (HuggingFace default)
+	if !useOllamaRegistry {
 		ch := make(chan any)
 		go func() {
 			defer close(ch)
@@ -905,7 +910,7 @@ func (s *Server) PullHandler(c *gin.Context) {
 		return
 	}
 
-	// Default to GGUF model handling
+	// Ollama registry (GGUF model) handling
 	name := model.ParseName(modelName)
 	if !name.IsValid() {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": errtypes.InvalidModelNameErrMsg})
