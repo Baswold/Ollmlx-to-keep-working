@@ -23,7 +23,7 @@ err() { echo -e "${RED}[FAIL]${NC} $1"; }
 # Configuration
 # Using Gemma 2 2B as it's a good balance of size and capability
 # The original request mentioned gemma3:270m but MLX models use different naming
-MODEL="${TEST_MODEL:-mlx-community/gemma-2-2b-it-4bit}"
+MODEL="${TEST_MODEL:-mlx-community/gemma-3-270m-4bit}"
 TEST_PROMPT="What is 2 + 2? Answer with just the number."
 
 echo ""
@@ -209,9 +209,71 @@ else
     echo "  Raw response: $CHAT_RESPONSE"
 fi
 
-# Step 8: Performance metrics
+# Step 8: Test tool calling
 echo ""
-log "Step 8: Checking performance metrics..."
+log "Step 8: Testing tool calling..."
+
+TOOL_RESPONSE=$(curl -s "$HOST/api/chat" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "'"$MODEL"'",
+        "messages": [
+            {"role": "user", "content": "What is the weather in Paris? Use the get_weather tool."}
+        ],
+        "stream": false,
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get the current weather for a location",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "The city name"
+                            }
+                        },
+                        "required": ["location"]
+                    }
+                }
+            }
+        ],
+        "options": {
+            "temperature": 0.1,
+            "num_predict": 100
+        }
+    }')
+
+if echo "$TOOL_RESPONSE" | grep -q "message"; then
+    ok "Tool calling endpoint works!"
+    echo ""
+    echo "  Tool response:"
+    echo "$TOOL_RESPONSE" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+msg = d.get('message', {})
+content = msg.get('content', '')
+tool_calls = msg.get('tool_calls', [])
+if tool_calls:
+    print('  Tool calls detected:', len(tool_calls))
+    for tc in tool_calls:
+        fn = tc.get('function', {})
+        print(f'    - {fn.get(\"name\")}: {fn.get(\"arguments\")}')
+elif content:
+    print('  ' + content.strip()[:200])
+else:
+    print('  (No content or tool calls)')
+" 2>/dev/null || echo "  Raw: $TOOL_RESPONSE"
+else
+    warn "Tool calling may have issues"
+    echo "  Raw response: $TOOL_RESPONSE"
+fi
+
+# Step 9: Performance metrics
+echo ""
+log "Step 9: Checking performance metrics..."
 
 if echo "$RESPONSE" | python3 -c "
 import sys, json

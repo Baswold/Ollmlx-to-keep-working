@@ -52,6 +52,9 @@ cat > "$STAGING_DIR/README.txt" << 'EOF'
 ollmlx - Apple Silicon Optimized LLM Inference
 ===============================================
 
+This DMG includes everything you need - no additional setup required!
+(Python environment with MLX is bundled inside the app)
+
 Installation:
 1. Drag ollmlx.app to your Applications folder
 2. Launch ollmlx from Applications
@@ -65,11 +68,11 @@ Quick Start:
 CLI Usage:
 The ollmlx CLI is bundled inside the app. To use it:
 
-  # Option 1: Use from app bundle
-  /Applications/ollmlx.app/Contents/Resources/ollmlx --help
+  # Option 1: Use the wrapper (recommended - sets up environment)
+  /Applications/ollmlx.app/Contents/Resources/ollmlx-wrapper --help
 
-  # Option 2: Create a symlink
-  sudo ln -sf /Applications/ollmlx.app/Contents/Resources/ollmlx /usr/local/bin/ollmlx
+  # Option 2: Create a symlink for easy access
+  sudo ln -sf /Applications/ollmlx.app/Contents/Resources/ollmlx-wrapper /usr/local/bin/ollmlx
 
 Commands:
   ollmlx serve              Start the server
@@ -79,10 +82,11 @@ Commands:
   ollmlx doctor             Check system status
 
 Example:
-  ollmlx pull mlx-community/gemma-2-2b-it-4bit
-  ollmlx run mlx-community/gemma-2-2b-it-4bit
+  ollmlx pull mlx-community/gemma-3-270m-4bit
+  ollmlx run mlx-community/gemma-3-270m-4bit
 
-Documentation: https://github.com/ollama/ollama
+API Endpoint: http://localhost:11434
+Documentation: https://github.com/Baswold/ollmlx
 EOF
 
 # Create background image for DMG

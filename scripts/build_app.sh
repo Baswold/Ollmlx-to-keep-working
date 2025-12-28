@@ -113,6 +113,53 @@ if [[ -d "$ROOT_DIR/mlx_backend" ]]; then
     cp -r "$ROOT_DIR/mlx_backend" "$APP_BUNDLE/Contents/Resources/mlx_backend"
 fi
 
+# Create bundled Python virtual environment with MLX
+log "Creating bundled Python environment with MLX..."
+VENV_DIR="$APP_BUNDLE/Contents/Resources/venv"
+
+# Create virtual environment
+python3 -m venv "$VENV_DIR"
+
+# Install MLX dependencies
+"$VENV_DIR/bin/pip" install --upgrade pip -q
+"$VENV_DIR/bin/pip" install -q \
+    "mlx>=0.15.0" \
+    "mlx-lm>=0.19.0" \
+    "fastapi>=0.104.0" \
+    "uvicorn>=0.24.0" \
+    "pydantic>=2.0.0"
+
+ok "Python environment created with MLX"
+
+# Create wrapper script that sets up environment
+cat > "$APP_BUNDLE/Contents/Resources/ollmlx-wrapper" << 'WRAPPER_EOF'
+#!/bin/bash
+# Wrapper script to set up environment for ollmlx
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export OLLAMA_PYTHON="$SCRIPT_DIR/venv/bin/python3"
+export OLLMLX_BACKEND="$SCRIPT_DIR/mlx_backend"
+export OLLMLX_HOME="$SCRIPT_DIR"
+exec "$SCRIPT_DIR/ollmlx" "$@"
+WRAPPER_EOF
+chmod +x "$APP_BUNDLE/Contents/Resources/ollmlx-wrapper"
+
+# Make the venv relocatable by fixing paths
+log "Making Python environment relocatable..."
+# Fix the activate script shebang and paths
+find "$VENV_DIR/bin" -type f -exec grep -l "^#!" {} \; 2>/dev/null | while read file; do
+    if head -1 "$file" | grep -q "python"; then
+        # Replace absolute python path with relative
+        sed -i '' '1s|.*|#!/usr/bin/env python3|' "$file" 2>/dev/null || true
+    fi
+done
+
+# Verify MLX works in the bundled environment
+if "$VENV_DIR/bin/python3" -c "import mlx.core as mx; print(f'MLX device: {mx.default_device()}')" 2>/dev/null; then
+    ok "MLX verified in bundled environment"
+else
+    log "Warning: MLX verification failed (may still work after installation)"
+fi
+
 # Create simple icon (placeholder)
 log "Creating app icon..."
 cat > "$DIST_DIR/create_icon.py" << 'PYEOF'

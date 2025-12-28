@@ -50,21 +50,44 @@ ollmlx is a **drop-in replacement** for Ollama that swaps the GGUF/llama.cpp bac
 
 > 📖 **New here?** Start with [QUICKSTART_SIMPLE.md](docs/guides/QUICKSTART_SIMPLE.md) for the easiest setup!
 
-### 1. Install
+### Installation Options
+
+#### Option 1: One-Line Install (Recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/ollama/ollama.git
-cd ollama
+curl -fsSL https://raw.githubusercontent.com/Baswold/ollmlx/main/scripts/easy_install.sh | bash
+```
 
-# Auto-install (builds binaries, sets up venv, installs deps)
+This automatically:
+- Detects your platform (macOS Apple Silicon)
+- Sets up Python environment with MLX
+- Downloads or builds ollmlx
+- Adds to your PATH
+
+#### Option 2: Homebrew
+
+```bash
+brew tap Baswold/ollmlx
+brew install ollmlx
+```
+
+#### Option 3: Download DMG
+
+Download the latest `.dmg` from [Releases](https://github.com/Baswold/ollmlx/releases) and drag to Applications.
+
+#### Option 4: Build from Source
+
+```bash
+git clone https://github.com/Baswold/ollmlx.git
+cd ollmlx
 ./scripts/install_ollmlx.sh
+```
 
-# Verify your setup
-./ollmlx doctor
+### Verify Installation
 
-# Start the server
-./ollmlx serve
+```bash
+ollmlx doctor   # Check everything is set up
+ollmlx serve    # Start the server
 ```
 
 ### 2. Login (Optional)

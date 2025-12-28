@@ -83,6 +83,7 @@ class Options:
 class CompletionRequest:
     """Request format from Ollama server"""
     prompt: str
+    model: Optional[str] = None  # Model name (passed through from Ollama)
     format: Optional[str] = None  # "json" or JSON schema
     images: Optional[list] = None
     options: Optional[dict] = None
@@ -92,6 +93,23 @@ class CompletionRequest:
     logprobs: bool = False
     top_logprobs: int = 0
     tools: Optional[list] = None
+    stream: Optional[bool] = None  # Whether to stream responses
+    keep_alive: Optional[str] = None  # Keep-alive duration
+    # Additional fields from Ollama GenerateRequest that we accept but don't use
+    suffix: Optional[str] = None
+    system: Optional[str] = None
+    template: Optional[str] = None
+    context: Optional[list] = None
+    raw: bool = False
+    think: Optional[bool] = None
+
+
+def parse_completion_request(data: dict) -> CompletionRequest:
+    """Parse a completion request, ignoring unknown fields."""
+    import dataclasses
+    known_fields = {f.name for f in dataclasses.fields(CompletionRequest)}
+    filtered = {k: v for k, v in data.items() if k in known_fields}
+    return CompletionRequest(**filtered)
 
 
 @dataclass
@@ -493,8 +511,8 @@ async def completion_endpoint(request: dict) -> StreamingResponse:
     Matches the interface of llama.cpp runner's /completion endpoint
     """
     try:
-        # Parse request
-        req = CompletionRequest(**request)
+        # Parse request, ignoring unknown fields from Ollama
+        req = parse_completion_request(request)
         tools = request.get("tools") or []
         tools_present = bool(tools)
 
