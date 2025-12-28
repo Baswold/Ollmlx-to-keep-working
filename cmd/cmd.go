@@ -1603,7 +1603,7 @@ func chat(cmd *cobra.Command, opts runOptions) (*api.Message, error) {
 		fmt.Println("[MLX] For best performance on Apple Silicon:")
 		fmt.Println(" - Ensure MLX is using Metal (default); monitor with Activity Monitor > GPU")
 		fmt.Println(" - Use 4-bit MLX models from mlx-community for speed/memory wins")
-		fmt.Println(" - Keep OLLAMA_MODELS on fast local SSD; MLX cache is at $OLLAMA_MODELS/mlx")
+		fmt.Println(" - Keep models on fast local SSD; models are stored in ~/.ollmlx/models")
 	}
 
 	return &api.Message{Role: role, Thinking: thinkingContent.String(), Content: fullResponse.String()}, nil

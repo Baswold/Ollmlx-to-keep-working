@@ -49,8 +49,8 @@ type hfModelInfo struct {
 
 // NewMLXModelManager creates a new MLX model manager
 func NewMLXModelManager() *MLXModelManager {
-	// Use Ollama's model directory structure respecting environment overrides
-	modelsDir := filepath.Join(envconfig.Models(), "mlx")
+	// Use ollmlx model directory (defaults to ~/.ollmlx/models)
+	modelsDir := envconfig.Models()
 	os.MkdirAll(modelsDir, 0755)
 
 	return &MLXModelManager{
