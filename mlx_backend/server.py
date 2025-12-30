@@ -18,7 +18,8 @@ import logging
 import os
 import signal
 import sys
-from dataclasses import dataclass, asdict
+import dataclasses
+from dataclasses import dataclass, asdict, fields
 from pathlib import Path
 from typing import AsyncIterator, Optional
 import time
@@ -97,6 +98,19 @@ class Options:
     repeat_last_n: int = 64
     presence_penalty: float = 0.0
     frequency_penalty: float = 0.0
+    # Additional Ollama-compatible options (accepted but some may be ignored)
+    num_ctx: int = 32768  # Context window size
+    num_batch: int = 512  # Batch size for prompt processing
+    num_gpu: int = -1  # Number of GPU layers (-1 = all)
+    main_gpu: int = 0  # Main GPU index
+    low_vram: bool = False  # Low VRAM mode
+    seed: int = -1  # Random seed (-1 = random)
+    stop: Optional[list] = None  # Stop sequences
+    tfs_z: float = 1.0  # Tail free sampling
+    typical_p: float = 1.0  # Typical p sampling
+    mirostat: int = 0  # Mirostat sampling mode
+    mirostat_tau: float = 5.0  # Mirostat target entropy
+    mirostat_eta: float = 0.1  # Mirostat learning rate
 
 
 @dataclass
@@ -996,8 +1010,10 @@ async def completion_endpoint(request: dict) -> StreamingResponse:
                 yield CompletionResponse(content="", done=True, done_reason="stop").to_json() + "\n"
             return StreamingResponse(empty_response(), media_type="application/x-ndjson")
 
-        # Parse options
-        options = Options(**(req.options or {}))
+        # Parse options, filtering out unknown fields
+        known_option_fields = {f.name for f in fields(Options)}
+        filtered_options = {k: v for k, v in (req.options or {}).items() if k in known_option_fields}
+        options = Options(**filtered_options)
 
         # Generate responses
         async def response_generator():
