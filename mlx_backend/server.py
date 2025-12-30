@@ -989,8 +989,11 @@ async def completion_endpoint(request: dict) -> StreamingResponse:
         tools_present = bool(tools)
         images = req.images or []
 
+        # Empty prompt = model preload/warmup request, just return done
         if not req.prompt:
-            raise HTTPException(status_code=400, detail="Empty prompt")
+            async def empty_response():
+                yield CompletionResponse(content="", done=True, done_reason="stop").to_json() + "\n"
+            return StreamingResponse(empty_response(), media_type="application/x-ndjson")
 
         # Parse options
         options = Options(**(req.options or {}))

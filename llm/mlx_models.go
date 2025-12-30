@@ -70,6 +70,20 @@ var internalDirs = map[string]bool{
 	"mlx":       true,
 }
 
+// toDisplayName converts a filesystem name (with underscores) to display format (with slashes)
+// e.g., "mlx-community_Qwen2.5-0.5B" -> "mlx-community/Qwen2.5-0.5B"
+func toDisplayName(fsName string) string {
+	// Only convert the first underscore after known org prefixes
+	for _, prefix := range []string{"mlx-community_", "huggingface_", "meta-llama_", "mistralai_", "Qwen_", "google_", "microsoft_"} {
+		if strings.HasPrefix(fsName, prefix) {
+			org := strings.TrimSuffix(prefix, "_")
+			model := strings.TrimPrefix(fsName, prefix)
+			return org + "/" + model
+		}
+	}
+	return fsName
+}
+
 // ListModels returns all locally cached MLX models
 func (m *MLXModelManager) ListModels() ([]MLXModelInfo, error) {
 	var models []MLXModelInfo
@@ -104,6 +118,8 @@ func (m *MLXModelManager) ListModels() ([]MLXModelInfo, error) {
 			continue
 		}
 
+		// Convert to display name (org/model format)
+		info.Name = toDisplayName(entry.Name())
 		info.LocalPath = modelPath
 		models = append(models, info)
 	}

@@ -74,3 +74,4 @@ runner/ollamarunner/ollamarunner
 runner/mlxrunner/mlxrunner
 ollama-runner
 test_*.py
+local_tests/
