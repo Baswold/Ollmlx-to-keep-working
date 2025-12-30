@@ -19,26 +19,28 @@ BIN_DIR="$OLLMLX_DIR/bin"
 REPO_URL="https://github.com/Baswold/ollmlx"
 VERSION="${OLLMLX_VERSION:-latest}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
+# Colors - refined palette
+RED='\033[38;5;167m'
+GREEN='\033[38;5;72m'
+YELLOW='\033[38;5;178m'
+BLUE='\033[38;5;75m'
+DIM='\033[38;5;243m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-# Logging
-log() { echo -e "${BLUE}==>${NC} ${BOLD}$1${NC}"; }
-success() { echo -e "${GREEN}==>${NC} ${BOLD}$1${NC}"; }
-warn() { echo -e "${YELLOW}Warning:${NC} $1"; }
-error() { echo -e "${RED}Error:${NC} $1" >&2; exit 1; }
+# Logging - clean text-based indicators
+log() { echo -e "  ${DIM}[-]${NC}  $1"; }
+success() { echo -e "  ${GREEN}[ok]${NC} $1"; }
+warn() { echo -e "  ${YELLOW}[!]${NC}  $1"; }
+error() { echo -e "  ${RED}[x]${NC}  $1" >&2; exit 1; }
 
-# Banner
+# Banner - elegant, confident, minimal
 echo ""
-echo -e "${BOLD}╔═══════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║          ${GREEN}ollmlx${NC}${BOLD} Easy Installer            ║${NC}"
-echo -e "${BOLD}║   Run Ollama-compatible LLMs with MLX     ║${NC}"
-echo -e "${BOLD}╚═══════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "    ${BOLD}ollmlx${NC}"
+echo -e "    ${DIM}Apple Silicon LLM Inference${NC}"
+echo ""
+echo -e "    ${DIM}────────────────────────────────${NC}"
 echo ""
 
 # Detect platform
@@ -315,27 +317,22 @@ verify_installation() {
 # Print success message
 print_success() {
     echo ""
-    echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     ${BOLD}ollmlx installed successfully!${NC}${GREEN}        ║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════╝${NC}"
+    echo -e "    ${DIM}────────────────────────────────${NC}"
     echo ""
-    echo -e "${BOLD}Quick Start:${NC}"
+    echo -e "    ${GREEN}[ok]${NC} ${BOLD}Ready${NC}"
     echo ""
-    echo -e "  ${BLUE}1.${NC} Start a new terminal (or run: source ~/.zshrc)"
+    echo -e "    ${DIM}Get started:${NC}"
     echo ""
-    echo -e "  ${BLUE}2.${NC} Start the server:"
-    echo -e "     ${GREEN}ollmlx serve${NC}"
+    echo -e "        ${BOLD}ollmlx serve${NC}"
+    echo -e "        ${DIM}# Start the server${NC}"
     echo ""
-    echo -e "  ${BLUE}3.${NC} In another terminal, pull and run a model:"
-    echo -e "     ${GREEN}ollmlx pull mlx-community/gemma-3-270m-4bit${NC}"
-    echo -e "     ${GREEN}ollmlx run mlx-community/gemma-3-270m-4bit${NC}"
+    echo -e "        ${BOLD}ollmlx pull mlx-community/Llama-3.2-1B-Instruct-4bit${NC}"
+    echo -e "        ${DIM}# Download a model${NC}"
     echo ""
-    echo -e "${BOLD}Useful Commands:${NC}"
-    echo -e "  ollmlx list      - List installed models"
-    echo -e "  ollmlx doctor    - Check system status"
-    echo -e "  ollmlx --help    - Show all commands"
+    echo -e "        ${BOLD}ollmlx run mlx-community/Llama-3.2-1B-Instruct-4bit${NC}"
+    echo -e "        ${DIM}# Start chatting${NC}"
     echo ""
-    echo -e "${BOLD}Documentation:${NC} $REPO_URL"
+    echo -e "    ${DIM}────────────────────────────────${NC}"
     echo ""
 }
 

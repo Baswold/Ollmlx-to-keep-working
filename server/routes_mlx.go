@@ -618,12 +618,23 @@ func streamMLXChat(ctx context.Context, c *gin.Context, client *http.Client, por
 		if len(toolCalls) == 0 && chunk.Done {
 			if calls, ok := parseToolCallsFromText(full.String()); ok {
 				toolCalls = calls
-				contentOut = ""
 				detectedToolCalls = calls
+				// FIX: Extract non-JSON content to preserve reasoning/text
+				// Only clear content if it's purely JSON, otherwise keep it
+				fullText := full.String()
+				jsonStart := strings.Index(fullText, "{")
+				if jsonStart > 0 {
+					// There's text before the JSON - preserve it
+					contentOut = strings.TrimSpace(fullText[:jsonStart])
+				} else {
+					// Content is just JSON tool call, no need to show it again
+					contentOut = ""
+				}
 			}
 		} else if len(toolCalls) > 0 {
-			contentOut = ""
+			// Tool calls came from backend - preserve any reasoning text
 			detectedToolCalls = toolCalls
+			// Don't clear contentOut - let the model's response text through
 		}
 
 		respMsg := api.Message{Role: "assistant", Content: contentOut, ToolCalls: toolCalls}
@@ -797,46 +808,516 @@ func toolPromptBlock(tools api.Tools) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("\n\nYou can call tools by responding with JSON of the form {\"tool_calls\": [{\"name\": \"tool_name\", \"arguments\": {...}}]}\n")
+	b.WriteString("You have access to tools. When you need to call a function, output JSON in this format:\n")
+	b.WriteString("{\"tool_calls\":[{\"name\":\"function_name\",\"arguments\":{...}}]}\n\n")
+	b.WriteString("Available tools:\n")
 	for _, t := range tools {
-		b.WriteString("Tool: ")
+		b.WriteString("- ")
 		b.WriteString(t.Function.Name)
-		b.WriteString("\nDescription: ")
+		b.WriteString(": ")
 		b.WriteString(t.Function.Description)
-		if params, err := json.Marshal(t.Function.Parameters); err == nil {
-			b.WriteString("\nParameters (JSON Schema): ")
-			b.Write(params)
+		if len(t.Function.Parameters.Properties) > 0 {
+			b.WriteString(". Parameters: ")
+			first := true
+			for name := range t.Function.Parameters.Properties {
+				if !first {
+					b.WriteString(", ")
+				}
+				b.WriteString(name)
+				first = false
+			}
 		}
-		b.WriteString("\n\n")
+		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// ChatTemplateType represents different chat template formats
+type ChatTemplateType string
+
+const (
+	TemplateQwen      ChatTemplateType = "qwen"      // Qwen, Qwen2, Qwen2.5
+	TemplateLlama     ChatTemplateType = "llama"     // Llama 2, Llama 3, Code Llama
+	TemplateMistral   ChatTemplateType = "mistral"   // Mistral, Mixtral
+	TemplatePhi       ChatTemplateType = "phi"       // Phi-2, Phi-3
+	TemplateGemma     ChatTemplateType = "gemma"     // Gemma, Gemma 2
+	TemplateChatML    ChatTemplateType = "chatml"    // ChatML format (fallback)
+	TemplateSmolLM    ChatTemplateType = "smollm"    // SmolLM models
+	TemplateDefault   ChatTemplateType = "default"   // Generic fallback
+)
+
+// detectMLXChatTemplate determines the appropriate chat template based on model name
+func detectMLXChatTemplate(modelName string) ChatTemplateType {
+	lower := strings.ToLower(modelName)
+
+	// Qwen family (Qwen, Qwen2, Qwen2.5, etc.)
+	if strings.Contains(lower, "qwen") {
+		return TemplateQwen
+	}
+
+	// Llama family
+	if strings.Contains(lower, "llama") {
+		// Llama 3 uses a different format
+		if strings.Contains(lower, "llama-3") || strings.Contains(lower, "llama3") {
+			return TemplateLlama
+		}
+		return TemplateLlama
+	}
+
+	// Mistral/Mixtral
+	if strings.Contains(lower, "mistral") || strings.Contains(lower, "mixtral") {
+		return TemplateMistral
+	}
+
+	// Phi models
+	if strings.Contains(lower, "phi") {
+		return TemplatePhi
+	}
+
+	// Gemma models
+	if strings.Contains(lower, "gemma") {
+		return TemplateGemma
+	}
+
+	// SmolLM models
+	if strings.Contains(lower, "smollm") {
+		return TemplateSmolLM
+	}
+
+	// Default to ChatML (widely supported)
+	return TemplateChatML
+}
+
+// getImageToken returns the appropriate image token for a model
+func getImageToken(modelName string, imageIndex int) string {
+	lower := strings.ToLower(modelName)
+
+	// Qwen2-VL uses numbered image tokens
+	if strings.Contains(lower, "qwen") && strings.Contains(lower, "vl") {
+		return fmt.Sprintf("<image_%d>", imageIndex+1)
+	}
+
+	// LLaVA and most other VLMs use <image>
+	if strings.Contains(lower, "llava") || strings.Contains(lower, "pixtral") {
+		return "<image>"
+	}
+
+	// Paligemma uses <image>
+	if strings.Contains(lower, "paligemma") {
+		return "<image>"
+	}
+
+	// Idefics uses <image>
+	if strings.Contains(lower, "idefics") {
+		return "<image>"
+	}
+
+	// Default to <image>
+	return "<image>"
 }
 
 func formatChatPrompt(messages []api.Message, tools api.Tools) string {
+	return formatChatPromptWithModel(messages, tools, "")
+}
+
+func formatChatPromptWithModel(messages []api.Message, tools api.Tools, modelName string) string {
+	template := detectMLXChatTemplate(modelName)
+
+	switch template {
+	case TemplateQwen:
+		return formatQwenPrompt(messages, tools, modelName)
+	case TemplateLlama:
+		return formatLlamaPrompt(messages, tools, modelName)
+	case TemplateMistral:
+		return formatMistralPrompt(messages, tools, modelName)
+	case TemplatePhi:
+		return formatPhiPrompt(messages, tools, modelName)
+	case TemplateGemma:
+		return formatGemmaPrompt(messages, tools, modelName)
+	case TemplateSmolLM:
+		return formatSmolLMPrompt(messages, tools, modelName)
+	default:
+		return formatChatMLPrompt(messages, tools, modelName)
+	}
+}
+
+// formatQwenPrompt formats messages using Qwen's chat template
+func formatQwenPrompt(messages []api.Message, tools api.Tools, modelName string) string {
 	var b strings.Builder
-	b.WriteString("You are a helpful assistant.\n\n")
+
+	// System message with tools
+	b.WriteString("<|im_start|>system\nYou are a helpful assistant.")
+	if len(tools) > 0 {
+		b.WriteString(" ")
+		b.WriteString(toolPromptBlock(tools))
+	}
+	b.WriteString("<|im_end|>\n")
+
+	// User/assistant messages
 	for _, m := range messages {
-		b.WriteString(strings.ToUpper(m.Role))
-		b.WriteString(": ")
-		b.WriteString(m.Content)
+		b.WriteString("<|im_start|>")
+		b.WriteString(m.Role)
 		b.WriteString("\n")
+		// Add image placeholders for vision models
+		for i := range m.Images {
+			b.WriteString(getImageToken(modelName, i))
+			b.WriteString("\n")
+		}
+		b.WriteString(m.Content)
+		b.WriteString("<|im_end|>\n")
 	}
 
-	if len(tools) > 0 {
-		b.WriteString(toolPromptBlock(tools))
-		b.WriteString("If you need to use a tool, respond ONLY with the JSON tool_calls block. Otherwise, answer normally.\n")
+	// Start assistant response
+	b.WriteString("<|im_start|>assistant\n")
+
+	return b.String()
+}
+
+// formatLlamaPrompt formats messages using Llama's chat template
+func formatLlamaPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+	lower := strings.ToLower(modelName)
+	isLlama3 := strings.Contains(lower, "llama-3") || strings.Contains(lower, "llama3")
+
+	if isLlama3 {
+		// Llama 3 format
+		b.WriteString("<|begin_of_text|>")
+
+		// System message
+		b.WriteString("<|start_header_id|>system<|end_header_id|>\n\n")
+		b.WriteString("You are a helpful assistant.")
+		if len(tools) > 0 {
+			b.WriteString(" ")
+			b.WriteString(toolPromptBlock(tools))
+		}
+		b.WriteString("<|eot_id|>")
+
+		// User/assistant messages
+		for _, m := range messages {
+			b.WriteString("<|start_header_id|>")
+			b.WriteString(m.Role)
+			b.WriteString("<|end_header_id|>\n\n")
+			for i := range m.Images {
+				b.WriteString(getImageToken(modelName, i))
+				b.WriteString("\n")
+			}
+			b.WriteString(m.Content)
+			b.WriteString("<|eot_id|>")
+		}
+
+		// Start assistant response
+		b.WriteString("<|start_header_id|>assistant<|end_header_id|>\n\n")
+	} else {
+		// Llama 2 format
+		b.WriteString("[INST] <<SYS>>\nYou are a helpful assistant.")
+		if len(tools) > 0 {
+			b.WriteString(" ")
+			b.WriteString(toolPromptBlock(tools))
+		}
+		b.WriteString("\n<</SYS>>\n\n")
+
+		// Build conversation
+		for i, m := range messages {
+			if m.Role == "user" {
+				if i > 0 {
+					b.WriteString("[INST] ")
+				}
+				for j := range m.Images {
+					b.WriteString(getImageToken(modelName, j))
+					b.WriteString("\n")
+				}
+				b.WriteString(m.Content)
+				b.WriteString(" [/INST]")
+			} else if m.Role == "assistant" {
+				b.WriteString(" ")
+				b.WriteString(m.Content)
+				b.WriteString(" </s><s>")
+			}
+		}
 	}
 
 	return b.String()
 }
 
+// formatMistralPrompt formats messages using Mistral's chat template
+func formatMistralPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+
+	b.WriteString("<s>")
+
+	// Combine system message with first user message if present
+	sysMsg := "You are a helpful assistant."
+	if len(tools) > 0 {
+		sysMsg += " " + toolPromptBlock(tools)
+	}
+
+	firstUser := true
+	for _, m := range messages {
+		if m.Role == "user" {
+			b.WriteString("[INST] ")
+			if firstUser {
+				b.WriteString(sysMsg)
+				b.WriteString("\n\n")
+				firstUser = false
+			}
+			for i := range m.Images {
+				b.WriteString(getImageToken(modelName, i))
+				b.WriteString("\n")
+			}
+			b.WriteString(m.Content)
+			b.WriteString(" [/INST]")
+		} else if m.Role == "assistant" {
+			b.WriteString(m.Content)
+			b.WriteString("</s>")
+		}
+	}
+
+	return b.String()
+}
+
+// formatPhiPrompt formats messages using Phi's chat template
+func formatPhiPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+
+	// System message
+	b.WriteString("<|system|>\nYou are a helpful assistant.")
+	if len(tools) > 0 {
+		b.WriteString(" ")
+		b.WriteString(toolPromptBlock(tools))
+	}
+	b.WriteString("<|end|>\n")
+
+	// User/assistant messages
+	for _, m := range messages {
+		b.WriteString("<|")
+		b.WriteString(m.Role)
+		b.WriteString("|>\n")
+		for i := range m.Images {
+			b.WriteString(getImageToken(modelName, i))
+			b.WriteString("\n")
+		}
+		b.WriteString(m.Content)
+		b.WriteString("<|end|>\n")
+	}
+
+	// Start assistant response
+	b.WriteString("<|assistant|>\n")
+
+	return b.String()
+}
+
+// formatGemmaPrompt formats messages using Gemma's chat template
+func formatGemmaPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+
+	// Gemma uses a simpler format
+	for _, m := range messages {
+		if m.Role == "user" {
+			b.WriteString("<start_of_turn>user\n")
+			for i := range m.Images {
+				b.WriteString(getImageToken(modelName, i))
+				b.WriteString("\n")
+			}
+			b.WriteString(m.Content)
+			if len(tools) > 0 {
+				b.WriteString("\n\n")
+				b.WriteString(toolPromptBlock(tools))
+			}
+			b.WriteString("<end_of_turn>\n")
+		} else if m.Role == "assistant" {
+			b.WriteString("<start_of_turn>model\n")
+			b.WriteString(m.Content)
+			b.WriteString("<end_of_turn>\n")
+		}
+	}
+
+	// Start model response
+	b.WriteString("<start_of_turn>model\n")
+
+	return b.String()
+}
+
+// formatSmolLMPrompt formats messages using SmolLM's chat template
+func formatSmolLMPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+
+	// SmolLM uses ChatML-like format
+	b.WriteString("<|im_start|>system\nYou are a helpful AI assistant.")
+	if len(tools) > 0 {
+		b.WriteString(" ")
+		b.WriteString(toolPromptBlock(tools))
+	}
+	b.WriteString("<|im_end|>\n")
+
+	for _, m := range messages {
+		b.WriteString("<|im_start|>")
+		b.WriteString(m.Role)
+		b.WriteString("\n")
+		for i := range m.Images {
+			b.WriteString(getImageToken(modelName, i))
+			b.WriteString("\n")
+		}
+		b.WriteString(m.Content)
+		b.WriteString("<|im_end|>\n")
+	}
+
+	b.WriteString("<|im_start|>assistant\n")
+
+	return b.String()
+}
+
+// formatChatMLPrompt is the default fallback using ChatML format
+func formatChatMLPrompt(messages []api.Message, tools api.Tools, modelName string) string {
+	var b strings.Builder
+
+	// System message with tools
+	b.WriteString("<|im_start|>system\nYou are a helpful assistant.")
+	if len(tools) > 0 {
+		b.WriteString(" ")
+		b.WriteString(toolPromptBlock(tools))
+	}
+	b.WriteString("<|im_end|>\n")
+
+	// User/assistant messages
+	for _, m := range messages {
+		b.WriteString("<|im_start|>")
+		b.WriteString(m.Role)
+		b.WriteString("\n")
+		// Add image placeholders for vision models
+		for i := range m.Images {
+			b.WriteString(getImageToken(modelName, i))
+			b.WriteString("\n")
+		}
+		b.WriteString(m.Content)
+		b.WriteString("<|im_end|>\n")
+	}
+
+	// Start assistant response
+	b.WriteString("<|im_start|>assistant\n")
+
+	return b.String()
+}
+
+// extractImagesFromMessages collects all images from chat messages
+func extractImagesFromMessages(messages []api.Message) []api.ImageData {
+	var images []api.ImageData
+	for _, m := range messages {
+		images = append(images, m.Images...)
+	}
+	return images
+}
+
 func parseToolCallsFromText(text string) ([]api.ToolCall, bool) {
-	var envelope struct {
-		ToolCalls []api.ToolCall `json:"tool_calls"`
+	text = strings.TrimSpace(text)
+
+	// Try to find JSON in the text (models often add extra text around JSON)
+	var jsonCandidates []string
+	depth := 0
+	start := -1
+	for i, c := range text {
+		if c == '{' || c == '[' {
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		} else if c == '}' || c == ']' {
+			depth--
+			if depth == 0 && start >= 0 {
+				jsonCandidates = append(jsonCandidates, text[start:i+1])
+				start = -1
+			}
+		}
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(text)), &envelope); err == nil && len(envelope.ToolCalls) > 0 {
-		return envelope.ToolCalls, true
+	if len(jsonCandidates) == 0 {
+		jsonCandidates = []string{text}
 	}
+
+	for _, candidate := range jsonCandidates {
+		// Format 1: {"tool_calls": [{"name": ..., "arguments": ...}]} (simple format from models)
+		var simpleEnvelope struct {
+			ToolCalls []struct {
+				Name      string         `json:"name"`
+				Arguments map[string]any `json:"arguments"`
+			} `json:"tool_calls"`
+		}
+		if err := json.Unmarshal([]byte(candidate), &simpleEnvelope); err == nil && len(simpleEnvelope.ToolCalls) > 0 {
+			var result []api.ToolCall
+			for _, tc := range simpleEnvelope.ToolCalls {
+				if tc.Name != "" {
+					result = append(result, api.ToolCall{
+						Function: api.ToolCallFunction{
+							Name:      tc.Name,
+							Arguments: tc.Arguments,
+						},
+					})
+				}
+			}
+			if len(result) > 0 {
+				return result, true
+			}
+		}
+
+		// Format 2: {"tool_calls": [{"function": {...}}]} (OpenAI format)
+		var envelope struct {
+			ToolCalls []api.ToolCall `json:"tool_calls"`
+		}
+		if err := json.Unmarshal([]byte(candidate), &envelope); err == nil && len(envelope.ToolCalls) > 0 {
+			hasValidCall := false
+			for _, tc := range envelope.ToolCalls {
+				if tc.Function.Name != "" {
+					hasValidCall = true
+					break
+				}
+			}
+			if hasValidCall {
+				return envelope.ToolCalls, true
+			}
+		}
+
+		// Format 3: Direct array of tool calls
+		var directArray []api.ToolCall
+		if err := json.Unmarshal([]byte(candidate), &directArray); err == nil && len(directArray) > 0 {
+			return directArray, true
+		}
+
+		// Format 4: Single tool call object
+		var singleCall api.ToolCall
+		if err := json.Unmarshal([]byte(candidate), &singleCall); err == nil && singleCall.Function.Name != "" {
+			return []api.ToolCall{singleCall}, true
+		}
+
+		// Format 5: {"name": "fn", "arguments": {...}} (simple format)
+		var simpleCall struct {
+			Name      string         `json:"name"`
+			Arguments map[string]any `json:"arguments"`
+		}
+		if err := json.Unmarshal([]byte(candidate), &simpleCall); err == nil && simpleCall.Name != "" {
+			tc := api.ToolCall{
+				Function: api.ToolCallFunction{
+					Name:      simpleCall.Name,
+					Arguments: simpleCall.Arguments,
+				},
+			}
+			return []api.ToolCall{tc}, true
+		}
+
+		// Format 6: {"tool_name": {...}} - tool name as key
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(candidate), &obj); err == nil && len(obj) == 1 {
+			for name, args := range obj {
+				if argsMap, ok := args.(map[string]any); ok {
+					tc := api.ToolCall{
+						Function: api.ToolCallFunction{
+							Name:      name,
+							Arguments: argsMap,
+						},
+					}
+					return []api.ToolCall{tc}, true
+				}
+			}
+		}
+	}
+
 	return nil, false
 }
 
@@ -977,35 +1458,8 @@ func (s *Server) generateMLXModel(c *gin.Context, req *api.GenerateRequest) {
 			return
 		}
 
-		// If the model returned tool calls and tools were provided, attempt to
-		// execute them synchronously and re-run the model with the tool outputs
-		// appended to the prompt (non-streaming flow only).
-		if len(req.Tools) > 0 {
-			if toolCalls, ok := parseToolCallsFromText(resp.Response); ok && len(toolCalls) > 0 {
-				toolResults, err := executeToolCalls(ctx, req.Tools, toolCalls)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("tool execution failed: %v", err)})
-					return
-				}
-
-				// Build a follow-up request including the tool outputs for the model
-				followUp := *req
-				followUp.Prompt = req.Prompt + "\n\nTool results:\n" + toolResults
-
-				finalResp, err := collectMLXCompletion(ctx, client, port, &followUp)
-				if err != nil {
-					status := http.StatusInternalServerError
-					if errors.Is(err, context.Canceled) {
-						status = http.StatusRequestTimeout
-					}
-					c.JSON(status, gin.H{"error": err.Error()})
-					return
-				}
-				c.JSON(http.StatusOK, finalResp)
-				return
-			}
-		}
-
+		// For /api/generate, we just return the response as-is.
+		// Tool call JSON will be in the response if the model generated it.
 		c.JSON(http.StatusOK, resp)
 		return
 	}
@@ -1053,7 +1507,8 @@ func (s *Server) chatMLXModel(c *gin.Context, req *api.ChatRequest) {
 		stream = *req.Stream
 	}
 
-	prompt := formatChatPrompt(req.Messages, req.Tools)
+	prompt := formatChatPromptWithModel(req.Messages, req.Tools, req.Model)
+	images := extractImagesFromMessages(req.Messages)
 	genReq := &api.GenerateRequest{
 		Model:     req.Model,
 		Prompt:    prompt,
@@ -1062,6 +1517,7 @@ func (s *Server) chatMLXModel(c *gin.Context, req *api.ChatRequest) {
 		KeepAlive: req.KeepAlive,
 		Options:   req.Options,
 		Tools:     req.Tools,
+		Images:    images,
 	}
 
 	if stream {
@@ -1087,35 +1543,23 @@ func (s *Server) chatMLXModel(c *gin.Context, req *api.ChatRequest) {
 		return
 	}
 
-	// If the model requested tool calls and we have tool definitions, execute
-	// them and re-run the model with the tool outputs appended to the prompt.
+	// If the model requested tool calls, return them to the client.
+	// Standard Ollama behavior is to return tool calls for the client to handle.
 	if len(req.Tools) > 0 {
 		if toolCalls, ok := parseToolCallsFromText(resp.Response); ok && len(toolCalls) > 0 {
-			toolResults, err := executeToolCalls(ctx, req.Tools, toolCalls)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("tool execution failed: %v", err)})
-				return
+			// Return the tool calls in the message - client handles execution
+			message := api.Message{
+				Role:      "assistant",
+				Content:   "", // Clear content when we have tool calls
+				ToolCalls: toolCalls,
 			}
-			// Re-run model with tool outputs appended to prompt
-			follow := *genReq
-			follow.Prompt = genReq.Prompt + "\n\nTool results:\n" + toolResults
-			finalResp, err := collectMLXCompletion(ctx, client, port, &follow)
-			if err != nil {
-				status := http.StatusInternalServerError
-				if errors.Is(err, context.Canceled) {
-					status = http.StatusRequestTimeout
-				}
-				c.JSON(status, gin.H{"error": err.Error()})
-				return
-			}
-			message := api.Message{Role: "assistant", Content: finalResp.Response}
 			chatResp := api.ChatResponse{
 				Model:      req.Model,
-				CreatedAt:  finalResp.CreatedAt,
+				CreatedAt:  resp.CreatedAt,
 				Message:    message,
-				Done:       finalResp.Done,
-				DoneReason: finalResp.DoneReason,
-				Metrics:    finalResp.Metrics,
+				Done:       true,
+				DoneReason: "tool_calls",
+				Metrics:    resp.Metrics,
 			}
 			c.JSON(http.StatusOK, chatResp)
 			return
@@ -1137,29 +1581,84 @@ func (s *Server) chatMLXModel(c *gin.Context, req *api.ChatRequest) {
 }
 
 // parseParameterCount converts parameter size string to number
+// Supports formats like: "7b", "7B", "1.5b", "135m", "135M", "7 billion", "1,000,000,000"
 func parseParameterCount(paramSize string) int64 {
 	paramSize = strings.ToLower(strings.TrimSpace(paramSize))
+	if paramSize == "" {
+		return 0
+	}
 
-	// Handle common formats like "7b", "7 billion", "7,000,000,000"
-	if strings.HasSuffix(paramSize, "b") {
-		// Remove "b" suffix
-		numStr := strings.TrimSuffix(paramSize, "b")
+	// Remove commas and spaces
+	paramSize = strings.ReplaceAll(paramSize, ",", "")
+	paramSize = strings.ReplaceAll(paramSize, " ", "")
 
-		// Handle "7b" format
-		if numStr == "7" {
-			return 7_000_000_000
-		} else if numStr == "135m" {
-			return 135_000_000
-		} else if numStr == "1.7b" {
-			return 1_700_000_000
-		} else if numStr == "3b" {
-			return 3_000_000_000
-		} else if numStr == "1b" {
-			return 1_000_000_000
+	// Handle word suffixes first
+	if strings.HasSuffix(paramSize, "billion") {
+		numStr := strings.TrimSuffix(paramSize, "billion")
+		if val, err := strconv.ParseFloat(numStr, 64); err == nil {
+			return int64(val * 1_000_000_000)
+		}
+	}
+	if strings.HasSuffix(paramSize, "million") {
+		numStr := strings.TrimSuffix(paramSize, "million")
+		if val, err := strconv.ParseFloat(numStr, 64); err == nil {
+			return int64(val * 1_000_000)
+		}
+	}
+	if strings.HasSuffix(paramSize, "thousand") || strings.HasSuffix(paramSize, "k") {
+		numStr := strings.TrimSuffix(paramSize, "thousand")
+		numStr = strings.TrimSuffix(numStr, "k")
+		if val, err := strconv.ParseFloat(numStr, 64); err == nil {
+			return int64(val * 1_000)
 		}
 	}
 
-	// Default to 0 if we can't parse it
+	// Handle short suffixes: b (billion), m (million), k (thousand)
+	var multiplier float64 = 1
+
+	if strings.HasSuffix(paramSize, "b") {
+		paramSize = strings.TrimSuffix(paramSize, "b")
+		multiplier = 1_000_000_000
+	} else if strings.HasSuffix(paramSize, "m") {
+		paramSize = strings.TrimSuffix(paramSize, "m")
+		multiplier = 1_000_000
+	} else if strings.HasSuffix(paramSize, "t") {
+		// "t" for trillion (rare but possible)
+		paramSize = strings.TrimSuffix(paramSize, "t")
+		multiplier = 1_000_000_000_000
+	}
+
+	// Try to parse the numeric part
+	if val, err := strconv.ParseFloat(paramSize, 64); err == nil {
+		return int64(val * multiplier)
+	}
+
+	// If we can't parse it, try to extract any numbers we can find
+	// This handles cases like "Llama-3-70B" -> 70B
+	var numBuilder strings.Builder
+	var foundDot bool
+	for _, c := range paramSize {
+		if c >= '0' && c <= '9' {
+			numBuilder.WriteRune(c)
+		} else if c == '.' && !foundDot {
+			numBuilder.WriteRune(c)
+			foundDot = true
+		}
+	}
+
+	if numBuilder.Len() > 0 {
+		if val, err := strconv.ParseFloat(numBuilder.String(), 64); err == nil {
+			// If multiplier is still 1, make an educated guess based on value
+			if multiplier == 1 {
+				if val < 1000 {
+					// Probably in billions (e.g., "70" means 70B)
+					multiplier = 1_000_000_000
+				}
+			}
+			return int64(val * multiplier)
+		}
+	}
+
 	return 0
 }
 

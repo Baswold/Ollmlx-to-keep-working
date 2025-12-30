@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ollama/ollama/envconfig"
+	"github.com/ollama/ollama/readline"
 )
 
 var doctorCmd = &cobra.Command{
@@ -20,33 +21,48 @@ var doctorCmd = &cobra.Command{
 	Run:   DoctorHandler,
 }
 
+// Status indicators - clean text-based
+func statusOK(msg string) {
+	fmt.Printf("  %s[ok]%s  %s\n", readline.ColorSuccess, readline.ColorDefault, msg)
+}
+
+func statusWarn(msg string) {
+	fmt.Printf("  %s[!]%s   %s\n", readline.ColorWarning, readline.ColorDefault, msg)
+}
+
+func statusErr(msg string) {
+	fmt.Printf("  %s[x]%s   %s\n", readline.ColorError, readline.ColorDefault, msg)
+}
+
+func statusDim(msg string) {
+	fmt.Printf("  %s[-]%s   %s%s%s\n", readline.ColorMuted, readline.ColorDefault, readline.ColorMuted, msg, readline.ColorDefault)
+}
+
 func DoctorHandler(cmd *cobra.Command, args []string) {
-	fmt.Println("🩺  ollmlx Doctor")
-	fmt.Println("====================")
+	fmt.Println()
+	fmt.Printf("  %sollmlx%s  %sSystem Check%s\n", readline.ColorBold, readline.ColorDefault, readline.ColorMuted, readline.ColorDefault)
+	fmt.Printf("  %s────────────────────────────────%s\n", readline.ColorMuted, readline.ColorDefault)
+	fmt.Println()
 
 	// 1. Check OS/Arch
-	fmt.Print("Checking System...       ")
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
-		fmt.Println("✅ macOS (Apple Silicon)")
+		statusOK("macOS on Apple Silicon")
 	} else if runtime.GOOS == "darwin" {
-		fmt.Printf("⚠️  macOS (%s) - generic optimization\n", runtime.GOARCH)
+		statusWarn(fmt.Sprintf("macOS (%s) — MLX works best on Apple Silicon", runtime.GOARCH))
 	} else {
-		fmt.Printf("⚠️  %s/%s - MLX is optimized for Apple Silicon\n", runtime.GOOS, runtime.GOARCH)
+		statusWarn(fmt.Sprintf("%s/%s — MLX is optimized for Apple Silicon", runtime.GOOS, runtime.GOARCH))
 	}
 
 	// 2. Check Go
-	fmt.Print("Checking Go...           ")
 	if goPath, err := exec.LookPath("go"); err == nil {
 		out, _ := exec.Command(goPath, "version").Output()
-		fmt.Printf("✅ %s", strings.TrimSpace(string(out)))
-		// Parse version to warn if too old? Skipping for simplicity.
-		fmt.Println()
+		version := strings.TrimPrefix(strings.TrimSpace(string(out)), "go version ")
+		statusOK(version)
 	} else {
-		fmt.Println("❌ Not found (required to build from source)")
+		statusDim("Go not found (optional, for building)")
 	}
 
 	// 3. Check Python & MLX
-	fmt.Print("Checking Python...       ")
 	
 	// Logic matches server/routes_mlx.go
 	pythonPath := "python3"
@@ -74,7 +90,6 @@ func DoctorHandler(cmd *cobra.Command, args []string) {
 	}
 
 	// Verify Python version and MLX
-	// We run a small script to check both
 	checkScript := `
 import sys
 import importlib.util
@@ -83,52 +98,49 @@ v = sys.version_info
 print(f"Python {v.major}.{v.minor}.{v.micro}")
 
 if v < (3, 10):
-    print("❌ Python 3.10+ required")
+    print("FAIL: Python 3.10+ required")
     sys.exit(1)
 
 if importlib.util.find_spec("mlx") is None:
-    print("❌ mlx not installed")
+    print("FAIL: mlx not installed")
     sys.exit(1)
 else:
     import mlx.core as mx
-    print(f"✅ MLX installed")
+    print("OK: MLX installed")
 `
-	
+
 	cmdOut, err := exec.Command(pythonPath, "-c", checkScript).CombinedOutput()
 	output := strings.TrimSpace(string(cmdOut))
-	
+
 	if err != nil {
-		fmt.Printf("❌ Error running python at %s (%s)\n", pythonPath, source)
+		statusErr(fmt.Sprintf("Python at %s (%s)", pythonPath, source))
 		if len(output) > 0 {
-			fmt.Println("   Output:")
 			lines := strings.Split(output, "\n")
 			for _, l := range lines {
-				fmt.Printf("   > %s\n", l)
+				fmt.Printf("       %s%s%s\n", readline.ColorMuted, l, readline.ColorDefault)
 			}
 		}
 		if source == "venv" {
-			fmt.Println("\n   Try reinstalling dependencies: ./scripts/install_ollmlx.sh")
+			fmt.Printf("\n       %sTry: ./scripts/install_ollmlx.sh%s\n", readline.ColorMuted, readline.ColorDefault)
 		} else if source == "system" {
-			fmt.Println("\n   Try installing dependencies: pip install -r mlx_backend/requirements.txt")
+			fmt.Printf("\n       %sTry: pip install -r mlx_backend/requirements.txt%s\n", readline.ColorMuted, readline.ColorDefault)
 		}
 	} else {
-		// Output likely contains "Python 3.x.x\n✅ MLX installed"
 		lines := strings.Split(output, "\n")
-		// First line is version
-		fmt.Printf("✅ %s (%s)\n", lines[0], source)
-		
-		// Second line is MLX status
-		fmt.Print("Checking MLX...          ")
-		if len(lines) > 1 {
-			fmt.Println(lines[1])
-		} else {
-			fmt.Println("✅ Verified")
+		statusOK(fmt.Sprintf("%s (%s)", lines[0], source))
+
+		// MLX status
+		if len(lines) > 1 && strings.HasPrefix(lines[1], "OK:") {
+			statusOK("MLX installed")
+		}
 	}
-	}
+
 	// 4. Check Environment
-	fmt.Print("Checking Environment...  ")
-	fmt.Printf("✅ Models: %s\n", envconfig.Models())
+	statusOK(fmt.Sprintf("Models: %s", envconfig.Models()))
 
 	fmt.Println()
-	fmt.Println("Use 'ollmlx serve' to start the server.")
+	fmt.Printf("  %s────────────────────────────────%s\n", readline.ColorMuted, readline.ColorDefault)
+	fmt.Println()
+	fmt.Printf("  %sRun:%s  ollmlx serve\n", readline.ColorMuted, readline.ColorDefault)
+	fmt.Println()
 }

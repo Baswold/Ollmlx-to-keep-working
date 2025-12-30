@@ -22,8 +22,9 @@ type Spinner struct {
 
 func NewSpinner(message string) *Spinner {
 	s := &Spinner{
+		// Elegant arc spinner - minimal, refined, timeless
 		parts: []string{
-			"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
+			"◜", "◠", "◝", "◞", "◡", "◟",
 		},
 		started: time.Now(),
 	}
@@ -63,7 +64,8 @@ func (s *Spinner) String() string {
 }
 
 func (s *Spinner) start() {
-	s.ticker = time.NewTicker(100 * time.Millisecond)
+	// Slightly slower for a more elegant, less anxious feel
+	s.ticker = time.NewTicker(80 * time.Millisecond)
 	for range s.ticker.C {
 		s.value = (s.value + 1) % len(s.parts)
 		if !s.stopped.IsZero() {

@@ -10,6 +10,12 @@ fastapi>=0.104.0    # Web framework
 uvicorn>=0.24.0     # ASGI server
 pydantic>=2.0.0     # Data validation
 
+# Image processing (required for vision models)
+pillow>=10.0.0      # Image processing
+
+# Vision models (optional but recommended for image support)
+mlx-vlm>=0.1.0      # MLX vision-language models
+
 # Optional: for development
 pytest>=7.0.0
 aiohttp>=3.9.0      # For testing async endpoints

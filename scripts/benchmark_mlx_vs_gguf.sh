@@ -17,12 +17,12 @@ TIMEOUT=120
 
 # Check if both ollmlx and ollama are available
 if ! command -v ./ollmlx &> /dev/null; then
-    echo "❌ Error: ollmlx binary not found in current directory"
+    echo "[x] Error: ollmlx binary not found in current directory"
     exit 1
 fi
 
 if ! command -v ollama &> /dev/null; then
-    echo "⚠️  Warning: ollama binary not found. GGUF benchmarking will be skipped."
+    echo "[!] Warning: ollama binary not found. GGUF benchmarking will be skipped."
     OLLAMA_AVAILABLE=false
 else
     OLLAMA_AVAILABLE=true
@@ -86,9 +86,9 @@ benchmark_model() {
             total_time=$(echo "$total_time + $run_time" | bc)
             successful_runs=$((successful_runs + 1))
             
-            echo "    ✓ Success: ${token_count} tokens in ${run_time} seconds"
+            echo "    [ok] ${token_count} tokens in ${run_time} seconds"
         else
-            echo "    ✗ Failed: Exit code $exit_code"
+            echo "    [x] Failed: Exit code $exit_code"
         fi
     done
     
@@ -108,7 +108,7 @@ benchmark_model() {
         # Return performance data
         echo "$model_type,$model_name,$avg_tokens,$avg_time,$tokens_per_sec"
     else
-        echo "❌ All runs failed for $model_type model"
+        echo "[x] All runs failed for $model_type model"
         echo "$model_type,$model_name,0,0,0"
     fi
 }
@@ -135,7 +135,7 @@ if [ "$OLLAMA_AVAILABLE" = true ]; then
             gguf_result=$(benchmark_model "GGUF" "$MODEL_NAME" false)
             echo "$gguf_result" >> "$results_file"
         else
-            echo "❌ Failed to pull GGUF model"
+            echo "[x] Failed to pull GGUF model"
         fi
     fi
 else
@@ -157,7 +157,7 @@ else
         mlx_result=$(benchmark_model "MLX" "$mlx_model" true)
         echo "$mlx_result" >> "$results_file"
     else
-        echo "❌ Failed to pull MLX model"
+        echo "[x] Failed to pull MLX model"
     fi
 fi
 
@@ -182,9 +182,9 @@ if [ -n "$gguf_result" ] && [ -n "$mlx_result" ]; then
         echo "MLX Speedup: ${speedup}x faster than GGUF"
         
         if (( $(echo "$speedup > 2.0" | bc -l) )); then
-            echo "✅ Performance target achieved (2-3x faster)"
+            echo "[ok] Performance target achieved (2-3x faster)"
         else
-            echo "⚠️  Performance below target"
+            echo "[!] Performance below target"
         fi
     fi
 fi

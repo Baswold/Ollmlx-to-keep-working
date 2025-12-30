@@ -9,12 +9,12 @@ echo ""
 echo "1. Building ollmlx..."
 cd /Users/basil_jackson/Documents/Ollama-MLX
 go build -o ollmlx . 2>&1 | grep -v "warning: ignoring duplicate libraries"
-echo "   ✓ Binary built successfully"
+echo "   [ok] Binary built successfully"
 echo ""
 
 # Check binary name
 echo "2. Checking binary name..."
-./ollmlx --version | grep -q "ollmlx" && echo "   ✓ Binary is named 'ollmlx'" || echo "   ✗ Binary name is wrong"
+./ollmlx --version | grep -q "ollmlx" && echo "   [ok] Binary is named 'ollmlx'" || echo "   [x] Binary name is wrong"
 echo ""
 
 # Start server
@@ -25,9 +25,9 @@ sleep 3
 
 # Check if server is running
 if curl -s http://localhost:11434/api/version > /dev/null 2>&1; then
-    echo "   ✓ Server is running on port 11434"
+    echo "   [ok] Server is running on port 11434"
 else
-    echo "   ✗ Server failed to start"
+    echo "   [x] Server failed to start"
     echo "Log:"
     cat /tmp/ollmlx.log
     exit 1
@@ -57,9 +57,9 @@ echo "5. Testing MLX model detection..."
 MLX_RESPONSE=$(curl -s http://localhost:11434/api/generate -d '{"model":"mlx-community/Qwen2.5-0.5B-Instruct-4bit","prompt":"Hello"}')
 echo "   MLX model response: $MLX_RESPONSE"
 if echo "$MLX_RESPONSE" | grep -q "not found"; then
-    echo "   ✓ MLX model correctly detected (not found because not downloaded)"
+    echo "   [ok] MLX model correctly detected (not found because not downloaded)"
 else
-    echo "   ✗ MLX model detection failed"
+    echo "   [x] MLX model detection failed"
 fi
 echo ""
 
@@ -80,18 +80,18 @@ echo ""
 echo "8. Cleaning up..."
 kill $SERVER_PID 2>/dev/null
 wait $SERVER_PID 2>/dev/null
-echo "   ✓ Server stopped"
+echo "   [ok] Server stopped"
 echo ""
 
 echo "=== Test Complete ==="
 echo ""
 echo "Summary:"
-echo "✓ Binary builds successfully"
-echo "✓ Binary is named 'ollmlx'"
-echo "✓ Server starts and responds to requests"
-echo "✓ GGUF models work (generation, listing, showing)"
-echo "✓ MLX model detection works"
-echo "✓ MLX model pull attempts work (may fail due to HuggingFace auth)"
+echo "[ok] Binary builds successfully"
+echo "[ok] Binary is named 'ollmlx'"
+echo "[ok] Server starts and responds to requests"
+echo "[ok] GGUF models work (generation, listing, showing)"
+echo "[ok] MLX model detection works"
+echo "[ok] MLX model pull attempts work (may fail due to HuggingFace auth)"
 echo ""
 echo "Note: MLX model generation is not yet fully implemented."
 echo "This is expected - the MLX backend integration requires additional work."

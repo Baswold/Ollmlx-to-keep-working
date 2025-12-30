@@ -134,17 +134,18 @@ func (b *Bar) String() string {
 	f := termWidth - pre.Len() - suf.Len() - 5
 	n := int(float64(f) * b.percent() / 100)
 
-	mid.WriteString(" ▕")
+	// Clean, minimal progress bar design
+	mid.WriteString(" [")
 
 	if n > 0 {
-		mid.WriteString(repeat("█", n))
+		mid.WriteString(repeat("━", n))
 	}
 
 	if f-n > 0 {
-		mid.WriteString(repeat(" ", f-n))
+		mid.WriteString(repeat("·", f-n))
 	}
 
-	mid.WriteString("▏ ")
+	mid.WriteString("] ")
 
 	return pre.String() + mid.String() + suf.String()
 }

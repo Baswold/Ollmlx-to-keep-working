@@ -111,7 +111,7 @@ func (c *Client) do(ctx context.Context, method, path string, reqData, respData 
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
+	request.Header.Set("User-Agent", fmt.Sprintf("ollmlx/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
 
 	respObj, err := c.http.Do(request)
 	if err != nil {
@@ -158,7 +158,7 @@ func (c *Client) stream(ctx context.Context, method, path string, data any, fn f
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/x-ndjson")
-	request.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
+	request.Header.Set("User-Agent", fmt.Sprintf("ollmlx/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
 
 	response, err := c.http.Do(request)
 	if err != nil {

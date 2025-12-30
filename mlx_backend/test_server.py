@@ -27,10 +27,10 @@ def test_health_check():
         response = requests.get(f"{BASE_URL}/health", timeout=5)
         response.raise_for_status()
         data = response.json()
-        print(f"✓ Health check passed: {data}")
+        print(f"[ok] Health check passed: {data}")
         return True
     except Exception as e:
-        print(f"✗ Health check failed: {e}")
+        print(f"[x] Health check failed: {e}")
         return False
 
 
@@ -41,10 +41,10 @@ def test_info():
         response = requests.get(f"{BASE_URL}/info", timeout=5)
         response.raise_for_status()
         data = response.json()
-        print(f"✓ Info endpoint passed: {data}")
+        print(f"[ok] Info endpoint passed: {data}")
         return True
     except Exception as e:
-        print(f"✗ Info endpoint failed: {e}")
+        print(f"[x] Info endpoint failed: {e}")
         return False
 
 
@@ -78,7 +78,7 @@ def test_completion_streaming():
                 data = json.loads(line)
                 chunks.append(data)
                 if data.get("done", False):
-                    print(f"\n✓ Streaming completed: {len(chunks)} chunks received")
+                    print(f"\n[ok] Streaming completed: {len(chunks)} chunks received")
                     print(f"  Final response: {data}")
                     return True
                 else:
@@ -86,14 +86,14 @@ def test_completion_streaming():
                     content = data.get("content", "")
                     print(content, end="", flush=True)
 
-        print("\n✗ Streaming ended without 'done' flag")
+        print("\n[x] Streaming ended without 'done' flag")
         return False
 
     except requests.exceptions.Timeout:
-        print(f"✗ Request timeout after {TIMEOUT} seconds")
+        print(f"[x] Request timeout after {TIMEOUT} seconds")
         return False
     except Exception as e:
-        print(f"✗ Completion test failed: {e}")
+        print(f"[x] Completion test failed: {e}")
         return False
 
 
@@ -128,16 +128,16 @@ def test_response_format():
                 ]
                 for field in required_fields:
                     if field not in data:
-                        print(f"✗ Missing required field: {field}")
+                        print(f"[x] Missing required field: {field}")
                         return False
 
                 if data.get("done", False):
-                    print("✓ Response format is compatible")
+                    print("[ok] Response format is compatible")
                     return True
 
         return False
     except Exception as e:
-        print(f"✗ Format test failed: {e}")
+        print(f"[x] Format test failed: {e}")
         return False
 
 

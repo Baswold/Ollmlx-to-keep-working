@@ -287,7 +287,7 @@ func loadOrUnloadModel(cmd *cobra.Command, opts *runOptions) error {
 		if opts.ShowConnect {
 			p.StopAndClear()
 			if strings.HasPrefix(info.RemoteHost, "https://ollama.com") {
-				fmt.Fprintf(os.Stderr, "Connecting to '%s' on 'ollama.com' ⚡\n", info.RemoteModel)
+				fmt.Fprintf(os.Stderr, "Connecting to '%s' on 'ollama.com'\n", info.RemoteModel)
 			} else {
 				fmt.Fprintf(os.Stderr, "Connecting to '%s' on '%s'\n", info.RemoteModel, info.RemoteHost)
 			}
@@ -583,7 +583,7 @@ func HFLoginHandler(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println("🤗 HuggingFace Login")
+	fmt.Println("HuggingFace Login")
 	fmt.Println()
 	fmt.Println("To download private or gated models, you need a HuggingFace access token.")
 	fmt.Println("Get your token at: https://huggingface.co/settings/tokens")
@@ -605,7 +605,7 @@ func HFLoginHandler(cmd *cobra.Command, args []string) error {
 	// Validate token format (should start with hf_)
 	if !strings.HasPrefix(token, "hf_") {
 		fmt.Println()
-		fmt.Println("⚠️  Warning: Token doesn't start with 'hf_'. Make sure you copied the full token.")
+		fmt.Println("Warning: Token doesn't start with 'hf_'. Make sure you copied the full token.")
 	}
 
 	// Create directory with secure permissions
@@ -620,7 +620,7 @@ func HFLoginHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Login successful! Your token has been saved.")
+	fmt.Println("Login successful. Token saved.")
 	fmt.Println("   You can now pull private and gated models from HuggingFace.")
 	return nil
 }
@@ -641,7 +641,7 @@ func HFLogoutHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to remove token: %w", err)
 	}
 
-	fmt.Println("✅ Logged out successfully. Your HuggingFace token has been removed.")
+	fmt.Println("Logged out. Token removed.")
 	return nil
 }
 
@@ -1271,7 +1271,7 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 	}
 
 	if err == nil {
-		fmt.Fprintf(os.Stderr, "✓ Done\n")
+		fmt.Fprintf(os.Stderr, "Done\n")
 	}
 
 	return err

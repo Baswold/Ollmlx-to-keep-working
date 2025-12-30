@@ -221,14 +221,111 @@ The Go layer in `llm/server.go` handles:
 
 No changes to the HTTP API are needed—all endpoints work identically.
 
+## Vision Model Support
+
+The backend supports vision-language models (VLMs) for image understanding.
+
+### Supported Vision Models
+
+MLX vision models from Hugging Face, including:
+- `mlx-community/llava-1.5-7b-4bit`
+- `mlx-community/Qwen2-VL-7B-Instruct-4bit`
+- `mlx-community/pixtral-12b-4bit`
+
+### Usage with Images
+
+**API Request with Images:**
+```json
+{
+  "model": "mlx-community/llava-1.5-7b-4bit",
+  "prompt": "What do you see in this image?",
+  "images": ["<base64-encoded-image>"],
+  "options": {"num_predict": 100}
+}
+```
+
+**Chat API with Images:**
+```json
+{
+  "model": "mlx-community/llava-1.5-7b-4bit",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Describe this image",
+      "images": ["<base64-encoded-image>"]
+    }
+  ]
+}
+```
+
+### Requirements for Vision Models
+
+Install additional dependencies:
+```bash
+pip install mlx-vlm pillow
+```
+
+The backend will auto-detect vision models based on their config and use `mlx-vlm` for inference.
+
+## Tool Calling
+
+The backend supports tool/function calling. Models with good tool support include:
+- `mlx-community/Qwen2.5-3B-Instruct-4bit`
+- `mlx-community/Mistral-7B-Instruct-v0.3-4bit`
+
+### Tool Calling Example
+
+```json
+{
+  "model": "mlx-community/Qwen2.5-3B-Instruct-4bit",
+  "messages": [{"role": "user", "content": "What's the weather in SF?"}],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get weather for a location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {"type": "string"}
+          },
+          "required": ["location"]
+        }
+      }
+    }
+  ]
+}
+```
+
+## Testing
+
+### Feature Tests
+
+A comprehensive test script is provided:
+
+```bash
+# Test all features
+python test_features.py --all
+
+# Test only image support
+python test_features.py --test-images --vision-model mlx-community/llava-1.5-7b-4bit
+
+# Test only tool calling
+python test_features.py --test-tools --text-model mlx-community/Qwen2.5-3B-Instruct-4bit
+```
+
 ## Future Improvements
 
-- [ ] Support for vision models (multimodal)
-- [ ] LoRA fine-tuning support
-- [ ] Function calling / tool use
+- [x] Support for vision models (multimodal)
+- [x] Function calling / tool use
+- [x] Model-aware chat templates (Llama, Mistral, Qwen, Phi, Gemma, SmolLM)
+- [x] Model-aware embedding extraction strategies
 - [ ] Batch inference optimization
 - [ ] Model quantization utilities
 - [ ] Extended context length support
+
+> **Note:** LoRA fine-tuning was removed to focus on clean inference and stability. See main README for details.
 
 ## License
 

@@ -58,10 +58,26 @@ const (
 	ClearScreen = Esc + "[2J"
 	CursorReset = Esc + "[0;0f"
 
-	ColorGrey    = Esc + "[38;5;245m"
+	// Core palette - elegant, restrained, purposeful
 	ColorDefault = Esc + "[0m"
+	ColorBold    = Esc + "[1m"
+	ColorDim     = Esc + "[2m"
+	ColorItalic  = Esc + "[3m"
 
-	ColorBold = Esc + "[1m"
+	// Refined grays for hierarchy
+	ColorGrey     = Esc + "[38;5;245m" // Secondary text
+	ColorDarkGrey = Esc + "[38;5;240m" // Tertiary/muted
+	ColorLightGrey = Esc + "[38;5;250m" // Subtle emphasis
+
+	// Semantic colors - minimal, meaningful
+	ColorSuccess = Esc + "[38;5;72m"  // Soft sage green
+	ColorWarning = Esc + "[38;5;178m" // Warm amber
+	ColorError   = Esc + "[38;5;167m" // Soft coral red
+	ColorAccent  = Esc + "[38;5;75m"  // Calm sky blue
+	ColorMuted   = Esc + "[38;5;243m" // For metadata
+
+	// Special states
+	ColorThinking = Esc + "[38;5;103m" // Lavender for AI thinking
 
 	StartBracketedPaste = Esc + "[?2004h"
 	EndBracketedPaste   = Esc + "[?2004l"

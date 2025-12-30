@@ -12,8 +12,8 @@ from pathlib import Path
 
 def print_status(test_name, passed, message=""):
     """Print test result with formatting"""
-    status = "✓" if passed else "✗"
-    color = "\033[92m" if passed else "\033[91m"
+    status = "[ok]" if passed else "[x]"
+    color = "\033[38;5;72m" if passed else "\033[38;5;167m"
     reset = "\033[0m"
     print(f"{color}{status}{reset} {test_name}")
     if message:
@@ -163,7 +163,7 @@ def main():
     total_count = len(results)
 
     if all(results):
-        print(f"✅ All checks passed ({passed_count}/{total_count})")
+        print(f"[ok] All checks passed ({passed_count}/{total_count})")
         print("\nMLX backend is ready to use!")
         print("\nNext steps:")
         print("  1. Start the server: ./ollmlx serve")
@@ -171,7 +171,7 @@ def main():
         print("  3. Run inference: ./ollmlx run mlx-community/Llama-3.2-3B-Instruct-4bit")
         return 0
     else:
-        print(f"❌ Some checks failed ({passed_count}/{total_count} passed)")
+        print(f"[x] Some checks failed ({passed_count}/{total_count} passed)")
         print("\nFix the issues above before running ollmlx.")
         print("\nTo install missing dependencies:")
         print("  cd mlx_backend")
