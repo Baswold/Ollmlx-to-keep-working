@@ -68,6 +68,7 @@ var internalDirs = map[string]bool{
 	"blobs":     true,
 	"manifests": true,
 	"mlx":       true,
+	"ollama":    true, // Ollama-format models stored in separate subfolder
 }
 
 // toDisplayName converts a filesystem name (with underscores) to display format (with slashes)

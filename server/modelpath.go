@@ -103,7 +103,7 @@ func (mp ModelPath) GetManifestPath() (string, error) {
 	if !name.IsValid() {
 		return "", fs.ErrNotExist
 	}
-	return filepath.Join(envconfig.Models(), "manifests", name.Filepath()), nil
+	return filepath.Join(envconfig.Models(), "ollama", "manifests", name.Filepath()), nil
 }
 
 func (mp ModelPath) BaseURL() *url.URL {
@@ -114,7 +114,7 @@ func (mp ModelPath) BaseURL() *url.URL {
 }
 
 func GetManifestPath() (string, error) {
-	path := filepath.Join(envconfig.Models(), "manifests")
+	path := filepath.Join(envconfig.Models(), "ollama", "manifests")
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return "", fmt.Errorf("%w: ensure path elements are traversable", err)
 	}
@@ -132,7 +132,7 @@ func GetBlobsPath(digest string) (string, error) {
 	}
 
 	digest = strings.ReplaceAll(digest, ":", "-")
-	path := filepath.Join(envconfig.Models(), "blobs", digest)
+	path := filepath.Join(envconfig.Models(), "ollama", "blobs", digest)
 	dirPath := filepath.Dir(path)
 	if digest == "" {
 		dirPath = path
