@@ -32,8 +32,6 @@ import (
 func PullHuggingFaceModel(ctx context.Context, modelName string, fn func(api.ProgressResponse)) error {
 	slog.Info("pulling model from HuggingFace", "model", modelName)
 
-	digest := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(modelName)))
-
 	manager := llm.NewMLXModelManager()
 
 	// Check if model already exists
@@ -49,12 +47,19 @@ func PullHuggingFaceModel(ctx context.Context, modelName string, fn func(api.Pro
 		Status: fmt.Sprintf("pulling %s from HuggingFace", modelName),
 	})
 
-	err := manager.DownloadMLXModel(ctx, modelName, func(status string, completed int64, total int64) {
+	err := manager.DownloadMLXModel(ctx, modelName, func(progress llm.MLXDownloadProgress) {
+		// Generate per-file digest for proper progress tracking
+		// Each file gets its own digest so the CLI can track each file separately
+		var digest string
+		if progress.Filename != "" {
+			digest = fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(modelName+"/"+progress.Filename)))
+		}
+
 		fn(api.ProgressResponse{
-			Status:    status,
+			Status:    progress.Status,
 			Digest:    digest,
-			Completed: completed,
-			Total:     total,
+			Completed: progress.Completed,
+			Total:     progress.Total,
 		})
 	})
 

@@ -1,134 +1,334 @@
 ---
-title: Importing a Model
+title: Importing Models
 ---
 
 ## Table of Contents
 
-- [Importing a Safetensors model](#Importing-a-model-from-Safetensors-weights)
-- [Importing a GGUF file](#Importing-a-GGUF-based-model)
-- [Sharing models on ollama.com](#Sharing-your-model-on-ollamacom)
+- [LM Studio-Style Import (Drop-In Folders)](#lm-studio-style-import-drop-in-folders)
+- [Using Pre-Made Ollama Models](#using-pre-made-ollama-models)
+- [Importing from Safetensors Weights](#importing-from-safetensors-weights)
+- [Importing a GGUF File](#importing-a-gguf-file)
+- [Quantizing a Model](#quantizing-a-model)
+- [Sharing Your Model](#sharing-your-model-on-ollamacom)
 
-## Importing a model from Safetensors weights
+---
 
-First, create a `Modelfile` with a `FROM` command which points to the directory containing your Safetensors weights:
+## LM Studio-Style Import (Drop-In Folders)
+
+The easiest way to import models into ollmlx is simply dropping model folders into your models directory - just like LM Studio!
+
+### How It Works
+
+ollmlx uses **simple folder-based storage**. Any folder containing `config.json` and `.safetensors` weights (or `weights.npz`) is automatically recognized as a model.
+
+```
+~/.ollmlx/models/
+├── mlx-community_Llama-3.2-1B-Instruct-4bit/
+│   ├── config.json
+│   ├── model.safetensors
+│   ├── tokenizer.json
+│   └── tokenizer_config.json
+└── my-custom-model/
+    ├── config.json
+    ├── model-00001-of-00002.safetensors
+    ├── model-00002-of-00002.safetensors
+    └── tokenizer.json
+```
+
+### Import Steps
+
+**1. Copy your model folder to the models directory:**
+
+```bash
+# Copy a model you downloaded (e.g., from HuggingFace)
+cp -r ~/Downloads/my-mlx-model ~/.ollmlx/models/my-mlx-model
+
+# Or move it directly
+mv ~/Downloads/my-mlx-model ~/.ollmlx/models/
+```
+
+**2. Use it immediately:**
+
+```bash
+ollmlx run my-mlx-model
+```
+
+That's it! No registration, no manifest files, no complex import process.
+
+### Requirements
+
+For a folder to be recognized as a valid model, it must contain:
+
+- `config.json` - Model configuration
+- Weight files in one of these formats:
+  - `.safetensors` (single file or sharded: `model-00001-of-00002.safetensors`)
+  - `weights.npz`
+
+Optional but recommended files:
+- `tokenizer.json` - Tokenizer configuration
+- `tokenizer_config.json` - Additional tokenizer settings
+- `generation_config.json` - Generation parameters
+- `special_tokens_map.json` - Special token definitions
+- `preprocessor_config.json` - For vision models
+
+### Naming Conventions
+
+Model folder names are flexible. For HuggingFace-style naming, use underscores:
+
+```bash
+# HuggingFace style (org/model becomes org_model)
+~/.ollmlx/models/mlx-community_Llama-3.2-1B-Instruct-4bit/
+
+# Simple names work too
+~/.ollmlx/models/my-llama/
+~/.ollmlx/models/coding-assistant/
+```
+
+When you run `ollmlx list`, folder names with organization prefixes are displayed nicely:
+- `mlx-community_Llama-3.2-1B` displays as `mlx-community/Llama-3.2-1B`
+
+---
+
+## Using Pre-Made Ollama Models
+
+If you have existing Ollama models (GGUF format), you can use them with ollmlx by placing them in the dedicated Ollama subfolder.
+
+### Ollama Model Directory Structure
+
+```
+~/.ollmlx/models/
+├── ollama/                              # Ollama-format models go here
+│   └── manifests/
+│       └── registry.ollama.ai/
+│           └── library/
+│               └── llama3.2/
+│                   └── latest
+├── blobs/                               # Shared blob storage for GGUF
+└── mlx-community_Llama-3.2-1B/          # MLX models at root level
+```
+
+### Importing Existing Ollama Models
+
+**Option 1: Copy from existing Ollama installation**
+
+If you have Ollama installed and want to use those models with ollmlx:
+
+```bash
+# Copy the entire models directory from standard Ollama
+cp -r ~/.ollama/models/* ~/.ollmlx/models/
+
+# Or symlink to save disk space
+ln -s ~/.ollama/models/blobs ~/.ollmlx/models/blobs
+ln -s ~/.ollama/models/manifests ~/.ollmlx/models/manifests
+```
+
+**Option 2: Place downloaded Ollama models**
+
+If you downloaded Ollama model files (blobs + manifests) from another machine:
+
+```bash
+# Copy blobs (the actual model weights)
+cp -r /path/to/downloaded/blobs ~/.ollmlx/models/
+
+# Copy manifests (model metadata)
+cp -r /path/to/downloaded/manifests ~/.ollmlx/models/
+```
+
+### Using Both Model Types
+
+ollmlx automatically detects model format:
+
+```bash
+# List all models (shows both MLX and Ollama models)
+ollmlx list
+
+# Run MLX model
+ollmlx run mlx-community/Llama-3.2-1B-Instruct-4bit
+
+# Run Ollama GGUF model
+ollmlx run llama3.2
+```
+
+### Notes on Ollama Models
+
+- Ollama models use a **blob/manifest** structure (different from MLX's folder structure)
+- GGUF models work but don't benefit from MLX acceleration
+- For best performance on Apple Silicon, use MLX models when available
+- The `blobs`, `manifests`, and `ollama` directories are internal and filtered from model listings
+
+---
+
+## Importing from Safetensors Weights
+
+For Safetensors models that need custom configuration, use a Modelfile.
+
+### Steps
+
+**1. Create a `Modelfile`** pointing to your weights directory:
 
 ```dockerfile
 FROM /path/to/safetensors/directory
 ```
 
-If you create the Modelfile in the same directory as the weights, you can use the command `FROM .`.
-
-Now run the `ollama create` command from the directory where you created the `Modelfile`:
-
-```shell
-ollama create my-model
-```
-
-Lastly, test the model:
-
-```shell
-ollama run my-model
-```
-
-Ollama supports importing models for several different architectures including:
-
-- Llama (including Llama 2, Llama 3, Llama 3.1, and Llama 3.2);
-- Mistral (including Mistral 1, Mistral 2, and Mixtral);
-- Gemma (including Gemma 1 and Gemma 2); and
-- Phi3
-
-This includes importing foundation models as well as any fine tuned models which have been _fused_ with a foundation model.
-
-## Importing a GGUF based model
-
-If you have a GGUF based model it is possible to import it into Ollama. You can obtain a GGUF model by:
-
-- converting a Safetensors model with the `convert_hf_to_gguf.py` from Llama.cpp; or
-- downloading a model from a place such as HuggingFace
-
-To import a GGUF model, create a `Modelfile` containing:
+If the Modelfile is in the same directory as your weights:
 
 ```dockerfile
-FROM /path/to/file.gguf
+FROM .
 ```
 
-Once you have created your `Modelfile`, use the `ollama create` command to build the model.
+**2. Create the model:**
 
-```shell
-ollama create my-model
+```bash
+ollmlx create my-model
 ```
+
+**3. Run it:**
+
+```bash
+ollmlx run my-model
+```
+
+### Supported Architectures
+
+ollmlx supports importing Safetensors for these architectures:
+
+- Llama (including Llama 2, Llama 3, Llama 3.1, Llama 3.2, Llama 4)
+- Mistral (including Mistral 1, Mistral 2, Mistral 3, and Mixtral)
+- Gemma (including Gemma 1, Gemma 2, Gemma 3)
+- Qwen (including Qwen 2, Qwen 2.5, Qwen 3)
+- Phi-3 / Phi-3.5
+- DeepSeek
+
+This includes foundation models and fine-tuned models that have been _fused_ with a foundation model.
+
+---
+
+## Importing a GGUF File
+
+GGUF models can be imported directly.
+
+### Steps
+
+**1. Create a `Modelfile`:**
+
+```dockerfile
+FROM /path/to/model.gguf
+```
+
+**2. Create the model:**
+
+```bash
+ollmlx create my-model
+```
+
+**3. Test it:**
+
+```bash
+ollmlx run my-model
+```
+
+### Where to Get GGUF Models
+
+- **HuggingFace**: Search for models with `.gguf` files
+- **Convert yourself**: Use `convert_hf_to_gguf.py` from llama.cpp
+- **TheBloke**: Many quantized GGUF models available
+
+---
 
 ## Quantizing a Model
 
-Quantizing a model allows you to run models faster and with less memory consumption but at reduced accuracy. This allows you to run a model on more modest hardware.
+Quantization reduces model size and increases speed at the cost of some accuracy.
 
-Ollama can quantize FP16 and FP32 based models into different quantization levels using the `-q/--quantize` flag with the `ollama create` command.
+### Steps
 
-First, create a Modelfile with the FP16 or FP32 based model you wish to quantize.
+**1. Create a Modelfile** with your FP16 or FP32 model:
 
 ```dockerfile
 FROM /path/to/my/gemma/f16/model
 ```
 
-Use `ollama create` to then create the quantized model.
+**2. Create with quantization:**
 
-```shell
-$ ollama create --quantize q4_K_M mymodel
+```bash
+ollmlx create --quantize q4_K_M mymodel
+```
+
+Output:
+```
 transferring model data
 quantizing F16 model to Q4_K_M
-creating new layer sha256:735e246cc1abfd06e9cdcf95504d6789a6cd1ad7577108a70d9902fef503c1bd
-creating new layer sha256:0853f0ad24e5865173bbf9ffcc7b0f5d56b66fd690ab1009867e45e7d2c4db0f
+creating new layer sha256:735e246cc1abfd06...
+creating new layer sha256:0853f0ad24e58651...
 writing manifest
 success
 ```
 
 ### Supported Quantizations
 
-- `q4_0`
-- `q4_1`
-- `q5_0`
-- `q5_1`
+**Standard:**
+- `q4_0`, `q4_1`
+- `q5_0`, `q5_1`
 - `q8_0`
 
-#### K-means Quantizations
-
-- `q3_K_S`
-- `q3_K_M`
-- `q3_K_L`
-- `q4_K_S`
-- `q4_K_M`
-- `q5_K_S`
-- `q5_K_M`
+**K-means (better quality):**
+- `q3_K_S`, `q3_K_M`, `q3_K_L`
+- `q4_K_S`, `q4_K_M`
+- `q5_K_S`, `q5_K_M`
 - `q6_K`
 
-## Sharing your model on ollama.com
+**Recommendation:** `q4_K_M` offers a good balance of size, speed, and quality.
 
-You can share any model you have created by pushing it to [ollama.com](https://ollama.com) so that other users can try it out.
+---
 
-First, use your browser to go to the [Ollama Sign-Up](https://ollama.com/signup) page. If you already have an account, you can skip this step.
+## Sharing Your Model on ollama.com
 
-<img src="images/signup.png" alt="Sign-Up" width="40%" />
+Share your custom models with the community.
 
-The `Username` field will be used as part of your model's name (e.g. `jmorganca/mymodel`), so make sure you are comfortable with the username that you have selected.
+### Steps
 
-Now that you have created an account and are signed-in, go to the [Ollama Keys Settings](https://ollama.com/settings/keys) page.
+**1. Create an account** at [ollama.com/signup](https://ollama.com/signup)
 
-Follow the directions on the page to determine where your Ollama Public Key is located.
+Your username becomes part of your model names (e.g., `jmorganca/mymodel`).
 
-<img src="images/ollama-keys.png" alt="Ollama Keys" width="80%" />
+**2. Add your public key** at [ollama.com/settings/keys](https://ollama.com/settings/keys)
 
-Click on the `Add Ollama Public Key` button, and copy and paste the contents of your Ollama Public Key into the text field.
+**3. Name your model correctly:**
 
-To push a model to [ollama.com](https://ollama.com), first make sure that it is named correctly with your username. You may have to use the `ollama cp` command to copy
-your model to give it the correct name. Once you're happy with your model's name, use the `ollama push` command to push it to [ollama.com](https://ollama.com).
-
-```shell
-ollama cp mymodel myuser/mymodel
-ollama push myuser/mymodel
+```bash
+ollmlx cp mymodel myuser/mymodel
 ```
 
-Once your model has been pushed, other users can pull and run it by using the command:
+**4. Push to ollama.com:**
 
-```shell
-ollama run myuser/mymodel
+```bash
+ollmlx push myuser/mymodel
+```
+
+**5. Others can now use it:**
+
+```bash
+ollmlx run myuser/mymodel
+```
+
+---
+
+## Quick Reference
+
+| Method | Best For | Complexity |
+|--------|----------|------------|
+| Drop-in folder | MLX models from HuggingFace | Easiest |
+| Ollama folder | Existing GGUF models | Easy |
+| Modelfile (Safetensors) | Custom configs, fine-tunes | Medium |
+| Modelfile (GGUF) | Single GGUF files | Medium |
+| Quantization | Reducing model size | Advanced |
+
+### Model Directory Summary
+
+```
+~/.ollmlx/models/
+├── my-mlx-model/              # Drop-in MLX models (just copy!)
+├── mlx-community_Llama-3.2/   # HuggingFace-style MLX models
+├── ollama/                    # Ollama-format models (internal)
+├── blobs/                     # GGUF blob storage (internal)
+└── manifests/                 # GGUF manifests (internal)
 ```

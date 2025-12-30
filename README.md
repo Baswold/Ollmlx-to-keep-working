@@ -1,40 +1,40 @@
-# ollmlx 🚀
+# ollmlx
 
-**Apple Silicon Optimized LLM Inference** | **100% Ollama Compatible** | **MLX-Powered (GGUF replaced)**
+**Apple Silicon Optimized LLM Inference** | **100% Ollama Compatible** | **MLX-Powered**
 
-> **⚡ Claude Merged Edition** - This version combines the excellent infrastructure from `small_model` with the fully functional MLX backend from `big_model`. See [MERGE_SUMMARY.md](docs/archive/MERGE_SUMMARY.md) for details.
+> **Note:** This project is a fork of [Ollama](https://github.com/ollama/ollama), modified to use Apple's MLX framework for optimized inference on Apple Silicon. We are deeply grateful to the Ollama team for creating such an excellent foundation. See the [Acknowledgements](#acknowledgements) section for more details.
 
-## 🎯 Project Status
+## Project Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **MLX Generation** | ✅ Production Ready | Core feature complete, routing fixed |
-| **GGUF Support** | ✅ Production Ready | Full Ollama compatibility maintained |
-| **Tool-Calling** | ✅ Production Ready | Full streaming tool calling support implemented |
-| **Fine-Tuning** | ❌ Removed | Removed to focus on clean inference and stability |
-| **MLX Embeddings** | ✅ Implemented | Embedding support via `/api/embed` |
-| **Authentication** | ✅ Implemented | `ollmlx login` for HuggingFace (private/gated models) |
-| **Build** | ✅ Passing | Clean build |
-| **Tests** | ✅ Comprehensive | All critical paths tested and documented |
+| **MLX Generation** | Production Ready | Core feature complete, routing fixed |
+| **GGUF Support** | Production Ready | Full Ollama compatibility maintained |
+| **Tool-Calling** | Production Ready | Full streaming tool calling support implemented |
+| **Fine-Tuning** | Removed | Removed to focus on clean inference and stability |
+| **MLX Embeddings** | Implemented | Embedding support via `/api/embed` |
+| **Authentication** | Implemented | `ollmlx login` for HuggingFace (private/gated models) |
+| **Build** | Passing | Clean build |
+| **Tests** | Comprehensive | All critical paths tested and documented |
 
-**Production Readiness:** 98% 🚀
+**Production Readiness:** 98%
 
 > **Note:** MLX generation infrastructure is wired up with runner reuse and Hugging Face downloads. Embeddings are implemented using mean-pooling. Tool calling supports streaming. GGUF models work completely as expected.
 
-> **⚠️ Server/CLI Only:** ollmlx is a backend server and CLI tool. There is no GUI or desktop app. Use any Ollama-compatible client (like [Open WebUI](https://github.com/open-webui/open-webui), Ollama Desktop, or your IDE) to interact with ollmlx.
+> **Server/CLI Only:** ollmlx is a backend server and CLI tool. There is no GUI or desktop app. Use any Ollama-compatible client (like [Open WebUI](https://github.com/open-webui/open-webui), Ollama Desktop, or your IDE) to interact with ollmlx.
 
 > **ollmlx** is a high-performance LLM inference server optimized for Apple Silicon, delivering blazing-fast inference with full Ollama API compatibility.
 
-## 🎯 What is ollmlx?
+## What is ollmlx?
 
 ollmlx is a **drop-in replacement** for Ollama that swaps the GGUF/llama.cpp backend for Apple's **MLX** stack, while keeping the same CLI and HTTP API:
 
-- **⚡ Faster inference on Apple Silicon** (M1/M2/M3/M4/M5) by running MLX-native weights
-- **🔄 Exact Ollama API/CLI compatibility** – same commands/endpoints/ports
-- **📦 MLX model support** – pull HF `mlx-community/*` or `*-mlx` models directly with full progress bars and speed tracking
-- **🧠 Unified memory efficiency** – takes advantage of MLX on macOS
-- **💡 Simple swap** – keep your tools/IDE integrations; just point them at ollmlx
-- **🎛️ Metal acceleration** – best-effort default to MLX Metal device at backend start
+- **Faster inference on Apple Silicon** (M1/M2/M3/M4/M5) by running MLX-native weights
+- **Exact Ollama API/CLI compatibility** - same commands/endpoints/ports
+- **MLX model support** - pull HF `mlx-community/*` or `*-mlx` models directly with full progress bars and speed tracking
+- **Unified memory efficiency** - takes advantage of MLX on macOS
+- **Simple swap** - keep your tools/IDE integrations; just point them at ollmlx
+- **Metal acceleration** - best-effort default to MLX Metal device at backend start
 
 **CLI parity:**
 - Same verbs/flags as `ollama` (`pull`, `run`, `create`, `list`, `ps`, `rm`, `serve`), with new `login`/`logout` commands.
@@ -46,7 +46,7 @@ ollmlx is a **drop-in replacement** for Ollama that swaps the GGUF/llama.cpp bac
 - MLX-first: prefer MLX models from Hugging Face; use upstream Ollama for GGUF.
 - Zero client changes: IDEs, Copilot, LangChain, etc., continue to work by pointing at `ollmlx` on `localhost:11434`.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### One-Line Install
 
@@ -102,18 +102,18 @@ curl http://localhost:11434/api/generate -d '{
 }'
 ```
 
-## 📊 Performance Comparison
+## Performance Comparison
 
 | Metric               | ollmlx (MLX) | Ollama (GGUF) | Improvement |
 |----------------------|--------------|---------------|-------------|
 | Token generation     | 2-3x faster  | Baseline      | 200-300%    |
 | First token latency  | ~50ms        | ~150ms        | 70% faster  |
 | Memory usage         | Lower        | Higher        | Better      |
-| Apple Silicon usage  | Optimized    | Generic      | ✅          |
+| Apple Silicon usage  | Optimized    | Generic       | Better      |
 
 > **Note:** Performance varies by model size and hardware. MLX is specifically optimized for Apple Silicon's unified memory architecture.
 
-## 🎯 Why ollmlx?
+## Why ollmlx?
 
 ### For Developers
 - **Faster iteration** - Get responses instantly
@@ -130,11 +130,11 @@ curl http://localhost:11434/api/generate -d '{
 - **Privacy-focused** - All processing happens locally
 - **Reliable** - No internet required after setup
 
-## 📚 Supported Models
+## Supported Models
 
 ollmlx supports all MLX models from HuggingFace, including:
 
-### 🏆 Top Picks
+### Top Picks
 
 | Model                          | Size       | Parameters | Best For                     |
 |-------------------------------|------------|------------|------------------------------|
@@ -145,18 +145,18 @@ ollmlx supports all MLX models from HuggingFace, including:
 | **Gemma 2 2B**                 | ~1.5GB     | 2B         | Multilingual support         |
 | **Qwen 2.5 7B**                | ~4GB       | 7B         | Coding assistance            |
 
-### 🐣 Small & Fast
+### Small and Fast
 
 | Model                          | Size       | Parameters |
 |-------------------------------|------------|------------|
 | SmolLM2 135M                  | ~150MB     | 135M       |
 | SmolLM2 1.7B                  | ~1GB       | 1.7B       |
 
-### 📈 All Available Models
+### All Available Models
 
 Browse the full list: [https://huggingface.co/mlx-community](https://huggingface.co/mlx-community)
 
-## 🛠️ Usage Examples
+## Usage Examples
 
 ### Basic Chat
 
@@ -206,7 +206,7 @@ ollmlx show mlx-community/Llama-3.2-1B-Instruct-4bit
 ollmlx delete mlx-community/Llama-3.2-1B-Instruct-4bit
 ```
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Custom Models
 
@@ -249,7 +249,7 @@ export OLMLX_MODELS_DIR=~/custom-models
 export OLMLX_LOG_LEVEL=debug
 ```
 
-## 📈 Monitoring & Metrics
+## Monitoring and Metrics
 
 ollmlx provides detailed metrics:
 
@@ -264,7 +264,7 @@ curl http://localhost:11434/api/tags
 curl http://localhost:11434/api/ps
 ```
 
-## 🤖 IDE & Tool Integration
+## IDE and Tool Integration
 
 ollmlx works seamlessly with:
 
@@ -275,7 +275,7 @@ ollmlx works seamlessly with:
 - **LlamaIndex** - Works out of the box
 - **Any Ollama client** - 100% API compatible
 
-## 🔄 Migration from Ollama
+## Migration from Ollama
 
 Switching from Ollama to ollmlx is easy:
 
@@ -286,7 +286,7 @@ Switching from Ollama to ollmlx is easy:
 
 > **Note:** ollmlx maintains the same API, so no code changes are needed!
 
-## 📦 Model Management
+## Model Management
 
 ### Model Storage (LM Studio-Style)
 
@@ -344,7 +344,7 @@ ollmlx show -v mlx-community/Llama-3.2-1B-Instruct-4bit  # verbose
 ollmlx rm mlx-community/Llama-3.2-1B-Instruct-4bit
 ```
 
-## 🛡️ Security
+## Security
 
 ollmlx includes several security features:
 
@@ -353,7 +353,7 @@ ollmlx includes several security features:
 - **Model verification** - Checks model integrity
 - **Safe defaults** - Conservative resource limits
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -410,14 +410,14 @@ top -o cpu -R
 - **Discord**: Join our community
 - **Email**: Support email if available
 
-## 📖 Documentation
+## Documentation
 
 - **[Architecture](docs/MLX_ARCHITECTURE.md)** - Technical details
 - **[Supported Models](docs/SUPPORTED_MODELS.md)** - Full model list
 - **[Migration Guide](docs/MIGRATION_FROM_OLLAMA.md)** - Switching from Ollama
 - **[API Reference](api/)** - Complete API documentation
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how you can help:
 
@@ -441,23 +441,36 @@ cd ollmlx
 go test ./...
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## 🌟 Acknowledgements
+## Acknowledgements
 
-- **Apple MLX Team** - For creating the amazing MLX framework
-- **HuggingFace** - For hosting MLX models
-- **Ollama Community** - For inspiration and API compatibility
-- **All Contributors** - For making this project better
+This project would not be possible without the incredible work of others:
 
-## 📞 Contact
+### Ollama
+
+**ollmlx is a fork of [Ollama](https://github.com/ollama/ollama)**, the excellent open-source LLM inference server. We are deeply grateful to the Ollama team for:
+
+- Creating a clean, well-designed codebase that made this project possible
+- Building the CLI and API interfaces that ollmlx inherits
+- Establishing the model management patterns we build upon
+- Releasing their work under the MIT license, enabling projects like this
+
+The Ollama team's commitment to open source has been instrumental in making local LLM inference accessible to everyone. If you appreciate ollmlx, please also consider supporting and starring the original [Ollama project](https://github.com/ollama/ollama).
+
+### Other Acknowledgements
+
+- **Apple MLX Team** - For creating the MLX framework that powers our accelerated inference
+- **HuggingFace** - For hosting MLX models and providing the infrastructure for model distribution
+- **mlx-community** - For converting and maintaining MLX-optimized models
+- **All Contributors** - For helping improve this project
+
+## Contact
 
 For questions or feedback, please open an issue on GitHub.
 
 ---
 
 **ollmlx** - Making LLM inference fast, efficient, and accessible on Apple Silicon.
-
-![Ollmlx MLX Logo](docs/logo.png)

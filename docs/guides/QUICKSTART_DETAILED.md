@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with **ollmlx** in 5 minutes! 🚀
+Get up and running with **ollmlx** in 5 minutes!
 
 ---
 
@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python mlx_backend/validate_backend.py
 ```
 
-You should see all checks pass ✅
+You should see all checks pass.
 
 ### Step 3: Build (if needed)
 
@@ -69,7 +69,7 @@ This downloads a 234MB model optimized for MLX.
 ./ollmlx run mlx-community/gemma-3-270m-4bit
 ```
 
-Type your prompts and press Enter! 🎉
+Type your prompts and press Enter!
 
 ---
 
@@ -237,10 +237,10 @@ Typical performance on M2 Max:
 
 ---
 
-## That's It! 🎉
+## That's It!
 
 You're now running LLMs with Apple Silicon MLX acceleration!
 
-**Enjoy blazing-fast inference!** ⚡
+**Enjoy blazing-fast inference!**
 
 For more details, check out the full [README.md](README.md).

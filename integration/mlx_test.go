@@ -29,12 +29,12 @@ func TestMLXBackendLoading(t *testing.T) {
 	if manager.ModelExists(testModel) {
 		t.Log("Test model already exists, skipping download")
 	} else {
-		progressFn := func(status string, completed int64, total int64) {
+		progressFn := func(p llm.MLXDownloadProgress) {
 			pct := float64(0)
-			if total > 0 {
-				pct = (float64(completed) / float64(total)) * 100
+			if p.Total > 0 {
+				pct = (float64(p.Completed) / float64(p.Total)) * 100
 			}
-			t.Logf("Download progress: %s (%.1f%%)", status, pct)
+			t.Logf("Download progress: %s - %s (%.1f%%)", p.Status, p.Filename, pct)
 		}
 
 		err := manager.DownloadMLXModel(context.Background(), testModel, progressFn)
@@ -293,14 +293,14 @@ func TestMLXModelPull(t *testing.T) {
 	}
 
 	var progressCount int
-	progressFn := func(status string, completed int64, total int64) {
+	progressFn := func(p llm.MLXDownloadProgress) {
 		progressCount++
 		if progressCount <= 5 || progressCount%10 == 0 { // Log first 5 and every 10th
 			pct := float64(0)
-			if total > 0 {
-				pct = (float64(completed) / float64(total)) * 100
+			if p.Total > 0 {
+				pct = (float64(p.Completed) / float64(p.Total)) * 100
 			}
-			t.Logf("Download progress: %s (%.1f%%)", status, pct)
+			t.Logf("Download progress: %s - %s (%.1f%%)", p.Status, p.Filename, pct)
 		}
 	}
 

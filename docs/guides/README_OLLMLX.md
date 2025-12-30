@@ -1,6 +1,6 @@
 # ollmlx - MLX-Powered Ollama Fork
 
-**🚀 Apple Silicon Optimized** | **✨ 100% Ollama Compatible** | **🔄 MLX + GGUF Support**
+**Apple Silicon Optimized** | **100% Ollama Compatible** | **MLX + GGUF Support**
 
 ollmlx is a fork of Ollama that **replaces the GGUF/llama.cpp inference layer with MLX** while maintaining 100% compatibility with Ollama's API and CLI.
 
@@ -86,13 +86,13 @@ For ad-hoc downloads, references ending in `-mlx` (e.g., `gemma-3-270m-4bit`) ar
 
 | Feature                     | ollmlx         | Standard Ollama |
 | --------------------------- | -------------- | --------------- |
-| GGUF Models                 | ✅              | ✅               |
-| MLX Models                  | ✅              | ❌               |
-| Apple Silicon Optimized     | ✅ (via MLX)    | Partial         |
-| Auto Model Format Detection | ✅              | N/A             |
-| HuggingFace Integration     | ✅              | ❌               |
-| Ollama API Compatible       | ✅ 100%         | ✅               |
-| IDE Extensions Compatible   | ✅              | ✅               |
+| GGUF Models                 | Yes            | Yes             |
+| MLX Models                  | Yes            | No              |
+| Apple Silicon Optimized     | Yes (via MLX)  | Partial         |
+| Auto Model Format Detection | Yes            | N/A             |
+| HuggingFace Integration     | Yes            | No              |
+| Ollama API Compatible       | 100%           | Yes             |
+| IDE Extensions Compatible   | Yes            | Yes             |
 
 ## Architecture
 

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -397,8 +399,17 @@ func (m *MLXModelManager) fetchHFFileList(ctx context.Context, modelID string) (
 	return files, sizes, nil
 }
 
+// MLXDownloadProgress represents download progress for a single file
+type MLXDownloadProgress struct {
+	Filename  string // Current filename being downloaded
+	Completed int64  // Bytes completed for this file
+	Total     int64  // Total bytes for this file
+	Status    string // Status message
+}
+
 // DownloadMLXModel downloads an MLX model from HuggingFace
-func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, progressFn func(string, int64, int64)) error {
+// The progress callback receives per-file progress so each file can be tracked separately
+func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, progressFn func(MLXDownloadProgress)) error {
 	modelPath := m.GetModelPath(modelID)
 
 	// Create model directory
@@ -421,23 +432,7 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 	}
 
 	baseURL := fmt.Sprintf("%s/resolve/main", getMLXBaseURL(modelID))
-	
-	// Calculate total size
-	var totalSize int64
-	for _, f := range files {
-		totalSize += sizes[f]
-	}
-	
-	var totalDownloaded int64
 	client := &http.Client{Timeout: 30 * time.Minute}
-
-	updateProgress := func(status string, inc int64) {
-		if progressFn == nil {
-			return
-		}
-		totalDownloaded += inc
-		progressFn(status, totalDownloaded, totalSize)
-	}
 
 	for _, filename := range files {
 		if err := ctx.Err(); err != nil {
@@ -445,15 +440,37 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 		}
 		fileURL := fmt.Sprintf("%s/%s", baseURL, filename)
 		destPath := filepath.Join(modelPath, filename)
-		fileSize := sizes[filename]
+		expectedSize := sizes[filename]
 
-		// Initial report for this file
-		if progressFn != nil {
-			progressFn(fmt.Sprintf("pulling %s", filename), totalDownloaded, totalSize)
+		// Track if we've discovered the file size
+		var fileTotal int64 = expectedSize
+
+		// Only send initial progress if we already know the size
+		// Otherwise wait until we learn it from Content-Length
+		if progressFn != nil && fileTotal > 0 {
+			progressFn(MLXDownloadProgress{
+				Filename:  filename,
+				Completed: 0,
+				Total:     fileTotal,
+				Status:    fmt.Sprintf("pulling %s", filename),
+			})
 		}
 
-		err := m.downloadFile(ctx, client, fileURL, destPath, fileSize, func(n int64) {
-			updateProgress(fmt.Sprintf("pulling %s", filename), n)
+		_, err := m.downloadFileWithSize(ctx, client, fileURL, destPath, expectedSize, func(fileDownloaded int64, discoveredTotal int64) {
+			// Update file total if we discovered it from Content-Length
+			if fileTotal == 0 && discoveredTotal > 0 {
+				slog.Debug("discovered file total", "filename", filename, "discoveredTotal", discoveredTotal)
+				fileTotal = discoveredTotal
+			}
+			// Only report progress if we know the total size (for progress bar display)
+			if progressFn != nil && fileTotal > 0 {
+				progressFn(MLXDownloadProgress{
+					Filename:  filename,
+					Completed: fileDownloaded,
+					Total:     fileTotal,
+					Status:    fmt.Sprintf("pulling %s", filename),
+				})
+			}
 		})
 
 		if err != nil {
@@ -465,23 +482,26 @@ func (m *MLXModelManager) DownloadMLXModel(ctx context.Context, modelID string, 
 	}
 
 	if progressFn != nil {
-		progressFn("success", totalSize, totalSize)
+		progressFn(MLXDownloadProgress{
+			Status: "success",
+		})
 	}
 
 	cleanup = false
 
 	// Compute a lightweight digest for listing/show calls.
 	if digest, err := computeDigest(modelPath); err == nil {
-		// Just final status update, no size change
 		if progressFn != nil {
-			progressFn(fmt.Sprintf("digest %s", digest), totalSize, totalSize)
+			progressFn(MLXDownloadProgress{
+				Status: fmt.Sprintf("digest %s", digest),
+			})
 		}
 	}
 
 	return nil
 }
 
-// downloadFile downloads a file from a URL to a local path
+// downloadFile downloads a file from a URL to a local path with resume support
 func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client, url, destPath string, expectSize int64, progress func(int64)) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 		return err
@@ -494,6 +514,26 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 			progress(expectSize)
 		}
 		return nil
+	}
+
+	tmpPath := destPath + ".part"
+
+	// Check for existing partial download to resume
+	var existingSize int64
+	if stat, err := os.Stat(tmpPath); err == nil {
+		existingSize = stat.Size()
+		// If the partial file is already the expected size, just rename it
+		if expectSize > 0 && existingSize == expectSize {
+			if progress != nil {
+				progress(expectSize)
+			}
+			return os.Rename(tmpPath, destPath)
+		}
+		// If partial file is larger than expected, something is wrong - start fresh
+		if expectSize > 0 && existingSize > expectSize {
+			os.Remove(tmpPath)
+			existingSize = 0
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -515,6 +555,11 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
+	// Request resume from existing position if we have a partial file
+	if existingSize > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", existingSize))
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -526,15 +571,41 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 		return fmt.Errorf("authentication required - please run 'ollmlx login' with your HuggingFace token")
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	// Handle response based on status code
+	var out *os.File
+	var resuming bool
+
+	switch resp.StatusCode {
+	case http.StatusPartialContent:
+		// Server supports resume - append to existing file
+		resuming = true
+		out, err = os.OpenFile(tmpPath, os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return err
+		}
+		// Report the already-downloaded bytes as progress
+		if progress != nil {
+			progress(existingSize)
+		}
+	case http.StatusOK:
+		// Full download (server doesn't support Range, or no partial file)
+		if existingSize > 0 {
+			// Server didn't honor Range request, start fresh
+			os.Remove(tmpPath)
+		}
+		out, err = os.Create(tmpPath)
+		if err != nil {
+			return err
+		}
+	case http.StatusRequestedRangeNotSatisfiable:
+		// Range not satisfiable - file might be complete or corrupted
+		io.Copy(io.Discard, resp.Body)
+		os.Remove(tmpPath)
+		// Retry without Range header by recursing with no partial file
+		return m.downloadFile(ctx, client, url, destPath, expectSize, progress)
+	default:
 		io.Copy(io.Discard, resp.Body)
 		return fmt.Errorf("server returned status %d", resp.StatusCode)
-	}
-
-	tmpPath := destPath + ".part"
-	out, err := os.Create(tmpPath)
-	if err != nil {
-		return err
 	}
 	defer out.Close()
 
@@ -549,7 +620,16 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 	}
 
 	if _, err = io.Copy(out, reader); err != nil {
-		os.Remove(tmpPath)
+		// Don't remove partial file on error - allows resume on retry
+		if !resuming {
+			// Only keep partial for resume if we were starting fresh
+			// and got some data. Check if file has content.
+			if stat, statErr := os.Stat(tmpPath); statErr == nil && stat.Size() > 0 {
+				// Keep the partial file for resume
+				return fmt.Errorf("download interrupted (partial file saved for resume): %w", err)
+			}
+			os.Remove(tmpPath)
+		}
 		return err
 	}
 
@@ -558,6 +638,171 @@ func (m *MLXModelManager) downloadFile(ctx context.Context, client *http.Client,
 	}
 
 	return nil
+}
+
+// downloadFileWithSize downloads a file and returns the actual size downloaded
+// progress callback receives (bytesDownloadedSoFar, totalFileSize)
+func (m *MLXModelManager) downloadFileWithSize(ctx context.Context, client *http.Client, url, destPath string, expectSize int64, progress func(int64, int64)) (int64, error) {
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return 0, err
+	}
+
+	// Check if file already exists with expected size
+	if stat, err := os.Stat(destPath); err == nil && expectSize > 0 && stat.Size() == expectSize {
+		if progress != nil {
+			progress(expectSize, expectSize)
+		}
+		return expectSize, nil
+	}
+
+	tmpPath := destPath + ".part"
+
+	// Check for existing partial download to resume
+	var existingSize int64
+	if stat, err := os.Stat(tmpPath); err == nil {
+		existingSize = stat.Size()
+		// If partial file matches expected size, just rename it
+		if expectSize > 0 && existingSize == expectSize {
+			if progress != nil {
+				progress(expectSize, expectSize)
+			}
+			return expectSize, os.Rename(tmpPath, destPath)
+		}
+		// If partial file is larger than expected, start fresh
+		if expectSize > 0 && existingSize > expectSize {
+			os.Remove(tmpPath)
+			existingSize = 0
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	// Add HuggingFace token
+	token := getHFToken()
+	if token == "" {
+		for _, key := range []string{"HUGGINGFACEHUB_API_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HF_TOKEN"} {
+			if tok := strings.TrimSpace(os.Getenv(key)); tok != "" {
+				token = tok
+				break
+			}
+		}
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	// Request resume from existing position
+	if existingSize > 0 {
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-", existingSize))
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		io.Copy(io.Discard, resp.Body)
+		return 0, fmt.Errorf("authentication required - please run 'ollmlx login' with your HuggingFace token")
+	}
+
+	// Get actual file size from Content-Length or Content-Range
+	var actualTotalSize int64
+	if expectSize > 0 {
+		actualTotalSize = expectSize
+	} else if cl := resp.Header.Get("Content-Length"); cl != "" {
+		if size, err := strconv.ParseInt(cl, 10, 64); err == nil {
+			if existingSize > 0 && resp.StatusCode == http.StatusPartialContent {
+				// Content-Length is remaining bytes, add existing
+				actualTotalSize = existingSize + size
+			} else {
+				actualTotalSize = size
+			}
+		}
+	}
+	// DEBUG: Log Content-Length discovery
+	slog.Debug("downloadFileWithSize", "url", url, "statusCode", resp.StatusCode, "contentLength", resp.Header.Get("Content-Length"), "actualTotalSize", actualTotalSize)
+	// Try Content-Range header for partial content
+	if cr := resp.Header.Get("Content-Range"); cr != "" {
+		// Format: bytes 100-999/1000
+		if idx := strings.LastIndex(cr, "/"); idx >= 0 {
+			if size, err := strconv.ParseInt(cr[idx+1:], 10, 64); err == nil && size > 0 {
+				actualTotalSize = size
+			}
+		}
+	}
+
+	var out *os.File
+	var resuming bool
+	var downloaded int64
+
+	switch resp.StatusCode {
+	case http.StatusPartialContent:
+		resuming = true
+		out, err = os.OpenFile(tmpPath, os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return 0, err
+		}
+		downloaded = existingSize
+		if progress != nil {
+			progress(downloaded, actualTotalSize)
+		}
+	case http.StatusOK:
+		if existingSize > 0 {
+			os.Remove(tmpPath)
+		}
+		out, err = os.Create(tmpPath)
+		if err != nil {
+			return 0, err
+		}
+		// Send initial progress with discovered total size to initialize progress bar
+		if progress != nil && actualTotalSize > 0 {
+			progress(0, actualTotalSize)
+		}
+	case http.StatusRequestedRangeNotSatisfiable:
+		io.Copy(io.Discard, resp.Body)
+		os.Remove(tmpPath)
+		return m.downloadFileWithSize(ctx, client, url, destPath, expectSize, progress)
+	default:
+		io.Copy(io.Discard, resp.Body)
+		return 0, fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+	defer out.Close()
+
+	// Read with progress tracking
+	buf := make([]byte, 32*1024) // 32KB buffer
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := out.Write(buf[:n]); writeErr != nil {
+				return downloaded, writeErr
+			}
+			downloaded += int64(n)
+			if progress != nil {
+				progress(downloaded, actualTotalSize)
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			// Keep partial for resume
+			if !resuming && downloaded > 0 {
+				return downloaded, fmt.Errorf("download interrupted (partial file saved for resume): %w", readErr)
+			}
+			return downloaded, readErr
+		}
+	}
+
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		return downloaded, err
+	}
+
+	return downloaded, nil
 }
 
 // ProgressReader wraps an io.Reader to report progress

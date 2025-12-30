@@ -125,9 +125,9 @@ func TestMLXModelPull(t *testing.T) {
 
 		// Mock progress function
 		progressCalled := false
-		progressFn := func(status string, progress float64) {
+		progressFn := func(p llm.MLXDownloadProgress) {
 			progressCalled = true
-			t.Logf("Progress: %s (%.1f%%)", status, progress)
+			t.Logf("Progress: %s - %s (%d/%d)", p.Status, p.Filename, p.Completed, p.Total)
 		}
 
 		err := manager.DownloadMLXModel(context.Background(), testModel, progressFn)

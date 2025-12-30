@@ -17,10 +17,10 @@ ollama pull mlx-community/<model-name>
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| Llama-3.2-1B-Instruct-4bit | 1B | 4-bit | 45 tokens/sec | ~1.2GB | ✅ Excellent |
-| Llama-3.2-3B-Instruct-4bit | 3B | 4-bit | 28 tokens/sec | ~2.8GB | ✅ Excellent |
-| Llama-3.1-8B-Instruct-4bit | 8B | 4-bit | 12 tokens/sec | ~5.5GB | ✅ Good |
-| Llama-3-8B-Instruct-4bit | 8B | 4-bit | 11 tokens/sec | ~5.3GB | ✅ Good |
+| Llama-3.2-1B-Instruct-4bit | 1B | 4-bit | 45 tokens/sec | ~1.2GB | Excellent |
+| Llama-3.2-3B-Instruct-4bit | 3B | 4-bit | 28 tokens/sec | ~2.8GB | Excellent |
+| Llama-3.1-8B-Instruct-4bit | 8B | 4-bit | 12 tokens/sec | ~5.5GB | Good |
+| Llama-3-8B-Instruct-4bit | 8B | 4-bit | 11 tokens/sec | ~5.3GB | Good |
 
 **Usage**:
 ```bash
@@ -37,9 +37,9 @@ ollama run mlx-community/Llama-3.2-1B-Instruct-4bit
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| Mistral-7B-Instruct-v0.3-4bit | 7B | 4-bit | 13 tokens/sec | ~4.8GB | ✅ Excellent |
-| Mistral-7B-Instruct-v0.2-4bit | 7B | 4-bit | 13 tokens/sec | ~4.8GB | ✅ Good |
-| Mixtral-8x7B-Instruct-v0.1-4bit | 8x7B | 4-bit | 4 tokens/sec | ~26GB | ⚠️ Requires 32GB RAM |
+| Mistral-7B-Instruct-v0.3-4bit | 7B | 4-bit | 13 tokens/sec | ~4.8GB | Excellent |
+| Mistral-7B-Instruct-v0.2-4bit | 7B | 4-bit | 13 tokens/sec | ~4.8GB | Good |
+| Mixtral-8x7B-Instruct-v0.1-4bit | 8x7B | 4-bit | 4 tokens/sec | ~26GB | Requires 32GB RAM |
 
 **Usage**:
 ```bash
@@ -55,10 +55,10 @@ ollama pull mlx-community/Mistral-7B-Instruct-v0.3-4bit
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| Qwen2.5-0.5B-Instruct-4bit | 0.5B | 4-bit | 65 tokens/sec | ~600MB | ✅ Excellent |
-| Qwen2.5-1.5B-Instruct-4bit | 1.5B | 4-bit | 40 tokens/sec | ~1.5GB | ✅ Excellent |
-| Qwen2.5-3B-Instruct-4bit | 3B | 4-bit | 25 tokens/sec | ~2.6GB | ✅ Excellent |
-| Qwen2.5-7B-Instruct-4bit | 7B | 4-bit | 12 tokens/sec | ~5.2GB | ✅ Good |
+| Qwen2.5-0.5B-Instruct-4bit | 0.5B | 4-bit | 65 tokens/sec | ~600MB | Excellent |
+| Qwen2.5-1.5B-Instruct-4bit | 1.5B | 4-bit | 40 tokens/sec | ~1.5GB | Excellent |
+| Qwen2.5-3B-Instruct-4bit | 3B | 4-bit | 25 tokens/sec | ~2.6GB | Excellent |
+| Qwen2.5-7B-Instruct-4bit | 7B | 4-bit | 12 tokens/sec | ~5.2GB | Good |
 
 **Usage**:
 ```bash
@@ -74,9 +74,9 @@ ollama pull mlx-community/Qwen2.5-7B-Instruct-4bit
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| Phi-3.5-mini-instruct-4bit | 3.8B | 4-bit | 22 tokens/sec | ~2.8GB | ✅ Excellent |
-| Phi-3-mini-4k-instruct-4bit | 3.8B | 4-bit | 22 tokens/sec | ~2.8GB | ✅ Good |
-| Phi-4-4bit | 14B | 4-bit | 7 tokens/sec | ~9.5GB | ✅ Good |
+| Phi-3.5-mini-instruct-4bit | 3.8B | 4-bit | 22 tokens/sec | ~2.8GB | Excellent |
+| Phi-3-mini-4k-instruct-4bit | 3.8B | 4-bit | 22 tokens/sec | ~2.8GB | Good |
+| Phi-4-4bit | 14B | 4-bit | 7 tokens/sec | ~9.5GB | Good |
 
 **Usage**:
 ```bash
@@ -92,9 +92,9 @@ ollama pull mlx-community/Phi-3.5-mini-instruct-4bit
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| gemma-2-2b-it-4bit | 2B | 4-bit | 35 tokens/sec | ~1.8GB | ✅ Excellent |
-| gemma-2-9b-it-4bit | 9B | 4-bit | 10 tokens/sec | ~6.2GB | ✅ Good |
-| gemma-2-27b-it-4bit | 27B | 4-bit | 3 tokens/sec | ~18GB | ⚠️ Requires 24GB RAM |
+| gemma-2-2b-it-4bit | 2B | 4-bit | 35 tokens/sec | ~1.8GB | Excellent |
+| gemma-2-9b-it-4bit | 9B | 4-bit | 10 tokens/sec | ~6.2GB | Good |
+| gemma-2-27b-it-4bit | 27B | 4-bit | 3 tokens/sec | ~18GB | Requires 24GB RAM |
 
 **Usage**:
 ```bash
@@ -110,9 +110,9 @@ ollama pull mlx-community/gemma-2-2b-it-4bit
 
 | Model | Size | Quantization | Performance (M2) | Memory | Status |
 |-------|------|--------------|------------------|---------|--------|
-| SmolLM2-135M-Instruct-4bit | 135M | 4-bit | 120 tokens/sec | ~250MB | ✅ Excellent |
-| SmolLM2-360M-Instruct-4bit | 360M | 4-bit | 85 tokens/sec | ~450MB | ✅ Excellent |
-| SmolLM2-1.7B-Instruct-4bit | 1.7B | 4-bit | 40 tokens/sec | ~1.5GB | ✅ Excellent |
+| SmolLM2-135M-Instruct-4bit | 135M | 4-bit | 120 tokens/sec | ~250MB | Excellent |
+| SmolLM2-360M-Instruct-4bit | 360M | 4-bit | 85 tokens/sec | ~450MB | Excellent |
+| SmolLM2-1.7B-Instruct-4bit | 1.7B | 4-bit | 40 tokens/sec | ~1.5GB | Excellent |
 
 **Usage**:
 ```bash
@@ -158,7 +158,7 @@ MLX supports multiple quantization levels. Most community models use 4-bit:
 
 | Quantization | Quality | Speed | Memory | Use Case |
 |--------------|---------|-------|--------|----------|
-| 4-bit | Good | Fast | Low | ✅ Recommended for most users |
+| 4-bit | Good | Fast | Low | Recommended for most users |
 | 8-bit | Better | Medium | Medium | High-quality responses needed |
 | 16-bit (fp16) | Best | Slow | High | Maximum quality, research |
 
@@ -193,7 +193,7 @@ Browse HuggingFace: https://huggingface.co/mlx-community
 ### Model-Specific Issues
 
 **Mixtral-8x7B**:
-- ⚠️ Requires 32GB RAM minimum
+- Requires 32GB RAM minimum
 - May have stability issues on 16GB systems
 - Use with `num_parallel=1` for better stability
 

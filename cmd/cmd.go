@@ -1295,7 +1295,9 @@ func pullVerbose(ctx context.Context, client *api.Client, modelName string, inse
 
 	fn := func(resp api.ProgressResponse) error {
 		if resp.Digest != "" {
-			if resp.Completed == 0 {
+			// Skip events with no progress data, but allow events that have a Total
+			// (these are used to initialize the progress bar with the file size)
+			if resp.Completed == 0 && resp.Total == 0 {
 				return nil
 			}
 

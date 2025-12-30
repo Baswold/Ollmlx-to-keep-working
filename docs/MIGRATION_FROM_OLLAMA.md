@@ -25,17 +25,17 @@ pip install -r mlx_backend/requirements.txt
 ## Should You Migrate?
 
 ### Migrate if you:
-✅ Use **Apple Silicon** (M1, M2, M3, M4)
-✅ Want **faster inference** on Mac
-✅ Need **better memory efficiency**
-✅ Want access to **HuggingFace MLX models**
-✅ Are comfortable with **Python + Go toolchain**
+- Use **Apple Silicon** (M1, M2, M3, M4)
+- Want **faster inference** on Mac
+- Need **better memory efficiency**
+- Want access to **HuggingFace MLX models**
+- Are comfortable with **Python + Go toolchain**
 
 ### Stick with Ollama if you:
-❌ Use **Intel Mac, Linux, or Windows**
-❌ Prefer **official/stable releases only**
-❌ Don't want to **manage Python dependencies**
-❌ Only use **GGUF models** from Ollama library
+- Use **Intel Mac, Linux, or Windows**
+- Prefer **official/stable releases only**
+- Don't want to **manage Python dependencies**
+- Only use **GGUF models** from Ollama library
 
 ## Installation
 
@@ -362,11 +362,11 @@ ollama show mlx-community/<model-name> | grep size
 **Symptom**: MLX models not faster than GGUF
 
 **Checklist**:
-- ✅ Verify you're on Apple Silicon: `uname -m` → `arm64`
-- ✅ Check model is actually MLX: `ollama show <model> | grep format`
-- ✅ Close background apps (frees GPU resources)
-- ✅ Use 4-bit quantized models for best speed
-- ✅ First generation is slower (model loading), subsequent ones are fast
+- Verify you're on Apple Silicon: `uname -m` should output `arm64`
+- Check model is actually MLX: `ollama show <model> | grep format`
+- Close background apps (frees GPU resources)
+- Use 4-bit quantized models for best speed
+- First generation is slower (model loading), subsequent ones are fast
 
 ## Reverting to Standard Ollama
 
@@ -486,6 +486,6 @@ A: Yes! See CONTRIBUTING.md for guidelines.
 
 ---
 
-**Welcome to ollmlx!** 🚀
+**Welcome to ollmlx!**
 
 Enjoy faster local LLM inference on your Apple Silicon Mac.
