@@ -392,7 +392,8 @@ class MLXModelManager:
             else:
                 if is_vlm and not MLX_VLM_AVAILABLE:
                     logger.warning("Vision model detected but mlx-vlm not installed. Install with: pip install mlx-vlm")
-                self.model, self.tokenizer = get_model(model_source)
+                # Use lazy=True for faster initial load (weights load on first use)
+                self.model, self.tokenizer = get_model(model_source, lazy=True)
                 self.is_vision_model = False
                 self.processor = None
                 self.image_processor = None
@@ -549,8 +550,8 @@ class MLXModelManager:
             # Tokenize input with error handling
             try:
                 prompt_tokens = self.tokenizer.encode(prompt)
-                if len(prompt_tokens) > 8192:  # Max context length
-                    raise ValueError(f"Prompt exceeds maximum context length (8192 tokens, got {len(prompt_tokens)})")
+                if len(prompt_tokens) > 131072:  # Max context length (128K for MLX)
+                    raise ValueError(f"Prompt exceeds maximum context length (131072 tokens, got {len(prompt_tokens)})")
             except Exception as tokenize_error:
                 raise RuntimeError(f"Failed to tokenize prompt: {tokenize_error}")
 
