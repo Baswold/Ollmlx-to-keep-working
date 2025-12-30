@@ -402,7 +402,8 @@ class MLXModelManager:
             if is_vlm and MLX_VLM_AVAILABLE:
                 logger.info(f"Detected vision-language model, loading with mlx-vlm")
                 self.model, self.processor = load_vlm(model_source)
-                self.tokenizer = self.processor
+                # VLM processors wrap a tokenizer - use it for encode/decode operations
+                self.tokenizer = self.processor.tokenizer if hasattr(self.processor, 'tokenizer') else self.processor
                 self.config = load_config(model_source)
                 self.is_vision_model = True
                 self.image_processor = self.processor
@@ -549,11 +550,11 @@ class MLXModelManager:
             prompt_eval_start = time.time()
             eval_start = time.time()
 
-            # Handle vision model generation
-            if self.is_vision_model and decoded_images and MLX_VLM_AVAILABLE:
+            # Handle vision model generation (use VLM path even for text-only prompts)
+            if self.is_vision_model and MLX_VLM_AVAILABLE:
                 async for response in self._generate_with_vision(
                     prompt=prompt,
-                    images=decoded_images,
+                    images=decoded_images if decoded_images else [],
                     temperature=temperature,
                     top_k=top_k,
                     top_p=top_p,
@@ -710,10 +711,10 @@ class MLXModelManager:
             token_count = 0
 
             # Format the prompt with image placeholders for the specific model
-            # Most VLMs expect <image> tokens in the prompt
+            # Only add image placeholder if we have images
             formatted_prompt = prompt
-            if "<image>" not in prompt.lower():
-                # Add image placeholder if not present
+            if images and "<image>" not in prompt.lower():
+                # Add image placeholder if not present and we have images
                 formatted_prompt = "<image>\n" + prompt
 
             # Apply chat template if available
