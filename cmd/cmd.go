@@ -1217,20 +1217,26 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 		displayName = displayName[:37] + "..."
 	}
 
-	// Simple status message (no spinner)
-	fmt.Fprintf(os.Stderr, "Pulling %s...\n", displayName)
-
 	// Track total progress across all layers
 	var totalSize int64
 	var totalCompleted int64
 	layerSizes := make(map[string]int64)
 	layerCompleted := make(map[string]int64)
 
-	var p *progress.Progress
+	// Start with a spinner immediately to show activity
+	p := progress.NewProgress(os.Stderr)
+	spinner := progress.NewSpinner(fmt.Sprintf("Pulling %s", displayName))
+	p.Add("status", spinner)
+
 	var mainBar *progress.Bar
 	downloadStarted := false
 
 	fn := func(resp api.ProgressResponse) error {
+		// Update spinner with status messages
+		if resp.Status != "" && !downloadStarted {
+			spinner.SetMessage(fmt.Sprintf("Pulling %s: %s", displayName, resp.Status))
+		}
+
 		if resp.Digest != "" && resp.Total > 0 {
 			// Track layer sizes for total calculation
 			if _, seen := layerSizes[resp.Digest]; !seen {
@@ -1243,11 +1249,13 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 			layerCompleted[resp.Digest] = resp.Completed
 			totalCompleted += (resp.Completed - prevCompleted)
 
-			// Create progress bar when downloading starts
+			// Switch from spinner to progress bar when downloading starts
 			if !downloadStarted && totalSize > 0 {
 				downloadStarted = true
+				// Stop spinner and start fresh with progress bar
+				p.StopAndClear()
 				p = progress.NewProgress(os.Stderr)
-				mainBar = progress.NewBar("", totalSize, 0)
+				mainBar = progress.NewBar(fmt.Sprintf("Pulling %s", displayName), totalSize, 0)
 				p.Add("main", mainBar)
 			}
 
@@ -1266,9 +1274,7 @@ func pullClean(ctx context.Context, client *api.Client, modelName string, insecu
 	request := api.PullRequest{Name: modelName, Insecure: insecure, Source: source}
 	err := client.Pull(ctx, &request, fn)
 
-	if p != nil {
-		p.Stop()
-	}
+	p.Stop()
 
 	if err == nil {
 		fmt.Fprintf(os.Stderr, "Done\n")
