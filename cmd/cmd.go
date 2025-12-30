@@ -203,7 +203,7 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 
 	if err := client.Create(cmd.Context(), req, fn); err != nil {
 		if strings.Contains(err.Error(), "path or Modelfile are required") {
-			return fmt.Errorf("the ollama server must be updated to use `ollama create` with this client")
+			return fmt.Errorf("the ollmlx server must be updated to use `ollmlx create` with this client")
 		}
 		return err
 	}
@@ -500,7 +500,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 	// If it's an embedding model, handle embedding generation
 	if isEmbeddingModel {
 		if opts.Prompt == "" {
-			return errors.New("embedding models require input text. Usage: ollama run " + name + " \"your text here\"")
+			return errors.New("embedding models require input text. Usage: ollmlx run " + name + " \"your text here\"")
 		}
 
 		// Get embedding-specific flags
